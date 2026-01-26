@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Gestão - Júlia Ribeiro</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js para Gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Animações simples */
+        .fade-in { animation: fadeIn 0.2s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .slide-up { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        /* Animação de Atualização */
+        @keyframes pulse-update {
+            0% { opacity: 1; }
+            50% { color: #940969; opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+        .value-updated {
+            animation: pulse-update 0.4s ease-in-out;
+        }
+
+        /* Cor Personalizada Júlia */
+        .bg-julia { background-color: #940969; }
+        .text-julia { color: #940969; }
+        .border-julia { border-color: #940969; }
+        
+        /* Dropdown Animation */
+        .dropdown-enter {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        .dropdown-enter-active {
+            opacity: 1;
+            transform: scale(1);
+            transition: opacity 100ms ease-out, transform 100ms ease-out;
+        }
+
+        /* Checkbox Customizado */
+        .custom-checkbox:checked {
+            background-color: #940969;
+            border-color: #940969;
+        }
+        
+        /* Sortable Header Styles */
+        th.sortable {
+            cursor: pointer;
+            transition: background-color 0.2s;
+            user-select: none;
+        }
+        th.sortable:hover {
+            background-color: #740652; 
+        }
+
+        /* Loading Overlay */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 h-screen flex overflow-hidden" onclick="closeAllDropdowns(event)">
+
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#940969]"></div>
+        <p class="mt-4 text-[#940969] font-medium animate-pulse">Sincronizando com a nuvem...</p>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col flex-shrink-0">
+        <div class="p-6 flex items-center gap-3 border-b border-gray-100">
+            <!-- Ícone da Sidebar com a nova cor -->
+            <div class="w-8 h-8 bg-[#940969] rounded-lg flex items-center justify-center shadow-sm">
+                <i data-lucide="layout-dashboard" class="text-white w-5 h-5"></i>
+            </div>
+            <!-- Nome Atualizado -->
+            <span class="font-bold text-lg text-gray-800 tracking-tight">Júlia Ribeiro</span>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-2">
+            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50">
+                <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                Painel de Tarefas
+            </button>
+            <button onclick="switchTab('list')" id="btn-list" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors bg-[#940969]/10 text-[#940969] shadow-sm">
+                <i data-lucide="list-todo" class="w-5 h-5"></i>
+                Lista de Tarefas
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-gray-100">
+            <!-- Monitor de Status da Nuvem -->
+            <div class="bg-gradient-to-br from-pink-50 to-purple-50 p-4 rounded-xl border border-pink-100 transition-colors" id="statusBox">
+                <h4 class="font-semibold text-[#940969] text-sm mb-1">Status da Nuvem</h4>
+                <div class="flex items-center gap-2 mt-2">
+                    <span id="statusDot" class="w-2 h-2 bg-gray-400 rounded-full"></span>
+                    <p id="statusText" class="text-xs text-pink-700 font-medium">Conectando...</p>
+                </div>
+                <p id="statusSubtext" class="text-[10px] text-pink-400 mt-1">Verificando conexão...</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden">
+        
+        <!-- HEADER -->
+        <header class="bg-white border-b border-gray-200 px-8 py-5 flex justify-between items-center flex-shrink-0 z-20 shadow-sm">
+            <div>
+                <h2 id="page-title" class="text-2xl font-bold text-gray-800">Gerenciamento de Tarefas</h2>
+                <p class="text-sm text-gray-500 mt-1">Acompanhamento de tarefas</p>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <!-- Botão Nova Tarefa -->
+                <button onclick="openModal()" class="flex items-center gap-2 bg-[#940969] text-white px-5 py-2.5 rounded-lg hover:bg-[#740652] transition-colors shadow-md hover:shadow-lg transform active:scale-95 duration-150">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline font-medium">Nova Tarefa</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- AREA DE SCROLL -->
+        <div class="flex-1 overflow-auto p-8">
+            <div class="max-w-[1600px] mx-auto space-y-8">
+
+                <!-- DASHBOARD VIEW (KPIs + GRÁFICOS) -->
+                <div id="dashboard-view" class="hidden space-y-6 slide-up">
+                    
+                    <!-- BARRA DE FILTROS DO DASHBOARD -->
+                    <div class="flex flex-col sm:flex-row justify-end items-center gap-3 bg-white/50 p-1 rounded-xl">
+                        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider mr-auto sm:ml-2">Filtros da Visão Geral:</span>
+                        
+                        <!-- Filtro de Competência Dashboard (Multi-Select) -->
+                        <div class="relative z-20">
+                            <button onclick="toggleFilterDropdown(event, 'dashboardCompetence')" class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors">
+                                <i data-lucide="calendar-range" class="w-4 h-4 text-[#940969]"></i>
+                                <span class="text-xs font-semibold text-gray-600 uppercase">Mês/Ano</span>
+                                <span id="dashboardCompetenceCountBadge" class="hidden bg-[#940969] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">0</span>
+                                <i data-lucide="chevron-down" class="w-3 h-3 text-gray-400"></i>
+                            </button>
+                            
+                            <div id="filterDropdownDashboardCompetence" class="hidden absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden p-2 dropdown-enter max-h-64 overflow-y-auto">
+                                <div id="dashboardCompetenceList" class="space-y-1">
+                                    <!-- Injetado via JS -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filtro Município Dashboard -->
+                        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+                            <i data-lucide="building-2" class="w-4 h-4 text-[#940969]"></i>
+                            <select id="dashboardMunicipalityFilter" class="bg-transparent text-xs font-semibold text-gray-600 uppercase focus:outline-none cursor-pointer min-w-[120px]">
+                                <!-- Opções injetadas via JS -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Linha de Cards Principais -->
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <!-- TOTAL -->
+                        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="p-2 bg-[#940969]/10 rounded-lg"><i data-lucide="layout-dashboard" class="w-5 h-5 text-[#940969]"></i></div>
+                            </div>
+                            <span class="text-gray-500 text-xs font-medium uppercase tracking-wider">Total Filtrado</span>
+                            <h3 id="card-total" class="text-2xl font-bold text-gray-800 mt-1 transition-colors duration-300">0</h3>
+                        </div>
+
+                        <!-- PENDENTES -->
+                        <div class="bg-white p-5 rounded-xl border border-orange-100 shadow-sm hover:shadow-md transition-shadow">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="p-2 bg-orange-50 rounded-lg"><i data-lucide="hourglass" class="w-5 h-5 text-orange-600"></i></div>
+                            </div>
+                            <span class="text-orange-600 text-xs font-medium uppercase tracking-wider">Pendentes</span>
+                            <h3 id="card-pending" class="text-2xl font-bold text-gray-800 mt-1 transition-colors duration-300">0</h3>
+                        </div>
+
+                        <!-- EM EXECUÇÃO -->
+                        <div class="bg-white p-5 rounded-xl border border-yellow-100 shadow-sm hover:shadow-md transition-shadow">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="p-2 bg-yellow-50 rounded-lg"><i data-lucide="clock" class="w-5 h-5 text-yellow-600"></i></div>
+                            </div>
+                            <span class="text-yellow-600 text-xs font-medium uppercase tracking-wider">Em Execução</span>
+                            <h3 id="card-execution" class="text-2xl font-bold text-gray-800 mt-1 transition-colors duration-300">0</h3>
+                        </div>
+
+                        <!-- CONCLUÍDAS -->
+                        <div class="bg-white p-5 rounded-xl border border-green-100 shadow-sm hover:shadow-md transition-shadow">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="p-2 bg-green-50 rounded-lg"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-600"></i></div>
+                            </div>
+                            <span class="text-green-600 text-xs font-medium uppercase tracking-wider">Concluídas</span>
+                            <h3 id="card-completed" class="text-2xl font-bold text-gray-800 mt-1 transition-colors duration-300">0</h3>
+                        </div>
+
+                        <!-- URGENTES P0 -->
+                        <div class="bg-white p-5 rounded-xl border border-red-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                            <div class="absolute right-0 top-0 w-16 h-16 bg-red-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                            <div class="flex justify-between items-start mb-2 relative z-10">
+                                <div class="p-2 bg-red-50 rounded-lg"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-600"></i></div>
+                            </div>
+                            <span class="text-red-600 text-xs font-medium uppercase tracking-wider relative z-10">Urgência P0</span>
+                            <h3 id="card-urgent" class="text-2xl font-bold text-gray-800 mt-1 relative z-10 transition-colors duration-300">0</h3>
+                        </div>
+                    </div>
+
+                    <!-- Novos Cards de Eficiência -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Tempo Médio -->
+                        <div class="bg-white p-5 rounded-xl border border-blue-100 shadow-sm flex items-center justify-between">
+                            <div>
+                                <span class="text-blue-600 text-xs font-medium uppercase tracking-wider">Tempo Médio de Resolução</span>
+                                <h3 id="card-avg-time" class="text-2xl font-bold text-gray-800 mt-1">0 dias</h3>
+                                <p class="text-xs text-gray-400 mt-1">Inclusão até Conclusão</p>
+                            </div>
+                            <div class="p-3 bg-blue-50 rounded-lg">
+                                <i data-lucide="timer" class="w-6 h-6 text-blue-600"></i>
+                            </div>
+                        </div>
+
+                        <!-- Prazos -->
+                        <div class="bg-white p-5 rounded-xl border border-purple-100 shadow-sm flex items-center justify-between">
+                            <div>
+                                <span class="text-purple-600 text-xs font-medium uppercase tracking-wider">Adesão ao Prazo</span>
+                                <div class="flex gap-4 mt-1">
+                                    <div>
+                                        <span class="block text-xl font-bold text-green-600" id="card-on-time">0</span>
+                                        <span class="text-[10px] text-gray-400">No Prazo</span>
+                                    </div>
+                                    <div class="w-px bg-gray-200"></div>
+                                    <div>
+                                        <span class="block text-xl font-bold text-red-500" id="card-overdue">0</span>
+                                        <span class="text-[10px] text-gray-400">Atrasadas</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-3 bg-purple-50 rounded-lg">
+                                <i data-lucide="calendar-check" class="w-6 h-6 text-purple-600"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Área de Gráficos -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Gráfico Municípios -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <i data-lucide="map-pin" class="w-4 h-4 text-[#940969]"></i> Demanda por Município
+                            </h3>
+                            <div class="h-64 relative">
+                                <canvas id="chartMunicipality"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Gráfico Sistemas -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <i data-lucide="monitor" class="w-4 h-4 text-[#940969]"></i> Demanda por Sistema
+                            </h3>
+                            <div class="h-64 relative flex justify-center">
+                                <canvas id="chartSystem"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LIST VIEW (TABELA + FILTROS) -->
+                <div id="list-view" class="space-y-6">
+                    <!-- BARRA DE FERRAMENTAS -->
+                    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <div class="relative w-full xl:w-96 group">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                            <input type="text" id="searchInput" placeholder="Buscar tarefa, sistema ou município..." 
+                                   class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#940969] focus:border-transparent text-sm transition-shadow">
+                        </div>
+                        
+                        <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+                            <!-- Filtro Status -->
+                            <div class="relative">
+                                <button onclick="toggleFilterDropdown(event, 'status')" class="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-colors">
+                                    <i data-lucide="filter" class="w-4 h-4 text-gray-500"></i>
+                                    <span class="text-xs font-semibold text-gray-500 uppercase">Status</span>
+                                    <span id="statusCountBadge" class="hidden bg-[#940969] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">0</span>
+                                    <i data-lucide="chevron-down" class="w-3 h-3 text-gray-400"></i>
+                                </button>
+                                
+                                <div id="filterDropdownStatus" class="hidden absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-30 overflow-hidden p-2 dropdown-enter">
+                                    <div class="space-y-1">
+                                        <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                                            <input type="checkbox" value="Todos" checked onchange="handleStatusChange(this)" class="custom-checkbox w-4 h-4 rounded border-gray-300 text-[#940969] focus:ring-[#940969]">
+                                            <span class="text-sm text-gray-700">Todos</span>
+                                        </label>
+                                        <div class="h-px bg-gray-100 my-1"></div>
+                                        <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                                            <input type="checkbox" value="Não iniciada" onchange="handleStatusChange(this)" class="custom-checkbox w-4 h-4 rounded border-gray-300 text-[#940969] focus:ring-[#940969]">
+                                            <span class="text-sm text-gray-700">Não iniciada</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                                            <input type="checkbox" value="Em execução" onchange="handleStatusChange(this)" class="custom-checkbox w-4 h-4 rounded border-gray-300 text-[#940969] focus:ring-[#940969]">
+                                            <span class="text-sm text-gray-700">Em execução</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                                            <input type="checkbox" value="REPASSADO" onchange="handleStatusChange(this)" class="custom-checkbox w-4 h-4 rounded border-gray-300 text-[#940969] focus:ring-[#940969]">
+                                            <span class="text-sm text-gray-700">Repassado</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                                            <input type="checkbox" value="Concluída" onchange="handleStatusChange(this)" class="custom-checkbox w-4 h-4 rounded border-gray-300 text-[#940969] focus:ring-[#940969]">
+                                            <span class="text-sm text-gray-700">Concluída</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Filtro de Competência (Multi-Select) -->
+                            <div class="relative">
+                                <button onclick="toggleFilterDropdown(event, 'competence')" class="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-colors">
+                                    <i data-lucide="calendar-range" class="w-4 h-4 text-gray-500"></i>
+                                    <span class="text-xs font-semibold text-gray-500 uppercase">Mês/Ano</span>
+                                    <span id="competenceCountBadge" class="hidden bg-[#940969] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">0</span>
+                                    <i data-lucide="chevron-down" class="w-3 h-3 text-gray-400"></i>
+                                </button>
+                                
+                                <div id="filterDropdownCompetence" class="hidden absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-30 overflow-hidden p-2 dropdown-enter max-h-64 overflow-y-auto">
+                                    <div id="competenceList" class="space-y-1">
+                                        <!-- Injetado via JS -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Filtro Município -->
+                            <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
+                                <i data-lucide="building-2" class="w-4 h-4 text-gray-500"></i>
+                                <span class="text-xs font-semibold text-gray-500 uppercase">Município:</span>
+                                <select id="municipalityFilter" class="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer max-w-[150px]">
+                                    <!-- Opções injetadas via JS -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TABELA -->
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-gray-600">
+                                <thead class="bg-[#940969] text-white font-semibold border-b border-[#740652]">
+                                    <tr>
+                                        <th onclick="handleSort('title')" class="px-6 py-4 whitespace-nowrap sortable group">
+                                            <div class="flex items-center gap-2">
+                                                ID / Tarefa
+                                                <i data-lucide="arrow-up-down" class="w-3 h-3 opacity-50 group-hover:opacity-100"></i>
+                                            </div>
+                                        </th>
+                                        <th onclick="handleSort('requester')" class="px-6 py-4 sortable group">
+                                            <div class="flex items-center gap-2">
+                                                Município / Sistema
+                                                <i data-lucide="arrow-up-down" class="w-3 h-3 opacity-50 group-hover:opacity-100"></i>
+                                            </div>
+                                        </th>
+                                        <th onclick="handleSort('priority')" class="px-6 py-4 text-center sortable group cursor-pointer">
+                                            <div class="flex items-center justify-center gap-2">
+                                                Prioridade
+                                                <i data-lucide="arrow-up-down" class="w-3 h-3 opacity-50 group-hover:opacity-100"></i>
+                                            </div>
+                                        </th>
+                                        <th onclick="handleSort('status')" class="px-6 py-4 text-center sortable group">
+                                            <div class="flex items-center justify-center gap-2">
+                                                Status
+                                                <i data-lucide="arrow-up-down" class="w-3 h-3 opacity-50 group-hover:opacity-100"></i>
+                                            </div>
+                                        </th>
+                                        <th onclick="handleSort('inclusionDate')" class="px-6 py-4 text-right sortable group">
+                                            <div class="flex items-center justify-end gap-2">
+                                                Data de Inclusão
+                                                <i data-lucide="arrow-up-down" class="w-3 h-3 opacity-50 group-hover:opacity-100"></i>
+                                            </div>
+                                        </th>
+                                        <th onclick="handleSort('deadline')" class="px-6 py-4 text-right sortable group">
+                                            <div class="flex items-center justify-end gap-2">
+                                                Prazo
+                                                <i data-lucide="arrow-up-down" class="w-3 h-3 opacity-50 group-hover:opacity-100"></i>
+                                            </div>
+                                        </th>
+                                        <th onclick="handleSort('completionDate')" class="px-6 py-4 text-right sortable group">
+                                            <div class="flex items-center justify-end gap-2">
+                                                Data de Conclusão
+                                                <i data-lucide="arrow-up-down" class="w-3 h-3 opacity-50 group-hover:opacity-100"></i>
+                                            </div>
+                                        </th>
+                                        <th class="px-6 py-4 w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody" class="divide-y divide-gray-100">
+                                    <!-- Linhas injetadas via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+                            <span id="resultsCount" class="text-sm text-gray-500">Mostrando 0 resultados</span>
+                            <div class="flex gap-2">
+                                <button class="px-3 py-1 border border-gray-200 rounded text-sm text-gray-600 disabled:opacity-50" disabled>Anterior</button>
+                                <button class="px-3 py-1 border border-gray-200 rounded text-sm text-gray-600 hover:bg-gray-50">Próximo</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL TAREFA (CRIAR/EDITAR) -->
+    <div id="modal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 fade-in">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 transform transition-all scale-100">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 id="modalTitle" class="font-bold text-gray-800 text-lg">Nova Tarefa</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-red-500 transition-colors">✕</button>
+            </div>
+            
+            <form id="demandForm" class="p-6 space-y-5">
+                <!-- ID de exibição (ex: T-001) -->
+                <input type="hidden" name="id" id="demandId">
+                <!-- ID do documento no Firestore -->
+                <input type="hidden" name="firestoreId" id="firestoreId">
+                
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Descrição da Tarefa</label>
+                    <input required name="title" id="inputTitle" type="text" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm" placeholder="Ex: Atualizar cadastro CNES...">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Município</label>
+                        <select id="modalMunicipality" name="requester" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm bg-white">
+                            <!-- Injetado via JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Sistema / ID</label>
+                        <select name="department" id="inputDepartment" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm bg-white">
+                            <option value="Atenção Primária" selected>Atenção Primária</option>
+                            <option value="BPA / FPO">BPA / FPO</option>
+                            <option value="CADSUS">CADSUS</option>
+                            <option value="CIHA">CIHA</option>
+                            <option value="CNES">CNES</option>
+                            <option value="e-SUS">e-SUS</option>
+                            <option value="Gestão">Gestão</option>
+                            <option value="SIA/SUS">SIA/SUS</option>
+                            <option value="SIH/SUS">SIH/SUS</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Prioridade</label>
+                        <select name="priority" id="inputPriority" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm bg-white">
+                            <option value="P0">P0 - Urgente</option>
+                            <option value="P1">P1 - Alta</option>
+                            <option value="P2" selected>P2 - Média</option>
+                            <option value="P3">P3 - Baixa</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Status Atual</label>
+                        <select name="status" id="inputStatus" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm bg-white">
+                            <option value="Não iniciada" selected>Não iniciada</option>
+                            <option value="Em execução">Em execução</option>
+                            <option value="REPASSADO">Repassado</option>
+                            <option value="Concluída">Concluída</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Data de Inclusão</label>
+                        <input name="inclusionDate" id="inputInclusionDate" type="date" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Prazo</label>
+                        <input name="deadline" id="inputDeadline" type="date" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm">
+                    </div>
+                </div>
+
+                <!-- Nova linha para Data de Conclusão -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Data de Conclusão</label>
+                    <input name="completionDate" id="inputCompletionDate" type="date" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm">
+                </div>
+
+                <div class="pt-6 flex justify-end gap-3 border-t border-gray-100 mt-2">
+                    <button type="button" onclick="closeModal()" class="px-5 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
+                    <button type="submit" class="px-5 py-2.5 bg-[#940969] text-white hover:bg-[#740652] rounded-lg text-sm font-medium shadow-md">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- DADOS PADRÃO (Carga Inicial) ---
+        const defaultDemands = [
+            { id: 'T-001', title: 'Procedimentos com % diferente FPO PMAE', department: 'BPA / FPO', priority: 'P0', requester: 'Camanducaia', status: 'Não iniciada', inclusionDate: '2025-06-29', completionDate: '', deadline: '', progress: 0 },
+            { id: 'T-002', title: 'Webnário terceiros e OCI', department: 'Outros', priority: 'P0', requester: 'Salto na Gestão', status: 'Não iniciada', inclusionDate: '2025-10-18', completionDate: '', deadline: '', progress: 0 },
+            { id: 'T-003', title: 'Dados POEPS - NOVEMBRO', department: 'Atenção Primária', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2025-12-01', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-004', title: 'Cadastro LRPD', department: 'CNES', priority: 'P0', requester: 'Delfim Moreira', status: 'Não iniciada', inclusionDate: '2025-12-04', completionDate: '', deadline: '', progress: 0 },
+            { id: 'T-005', title: 'Cadastro programa APAE', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2025-12-12', completionDate: '2026-01-09', deadline: '', progress: 100 },
+            { id: 'T-006', title: 'Atualizar site planejamento POEPS JAN 26', department: 'Atenção Primária', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-007', title: 'Atualizar site planejamento POEPS JAN 26', department: 'Atenção Primária', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-008', title: 'Atualizar site planejamento POEPS JAN 26', department: 'Atenção Primária', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-009', title: 'Atualizar site planejamento POEPS JAN 26', department: 'Atenção Primária', priority: 'P0', requester: 'Delfim Moreira', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-010', title: 'Atualizar site planejamento POEPS JAN 26', department: 'Atenção Primária', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-011', title: 'Atualizar site planejamento POEPS JAN 26', department: 'Atenção Primária', priority: 'P0', requester: 'Pedralva', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-012', title: 'Atualizar site MANUAL INTERATIVO CID10 CIAP 2', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-013', title: 'Incluir acompanhamento quadrimestre POEPS site Planejamento', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-014', title: 'Verificar lançamentos POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-015', title: 'Verificar lançamentos POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-016', title: 'Verificar lançamentos POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-017', title: 'Verificar lançamentos POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Delfim Moreira', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-018', title: 'Verificar lançamentos POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-019', title: 'Verificar lançamentos POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Pedralva', status: 'Concluída', inclusionDate: '2025-12-23', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-020', title: 'Atualizar site COFINANCIAMENTO (Qualidade e vínculo)', department: 'Atenção Primária', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-07', deadline: '', progress: 100 },
+            { id: 'T-021', title: 'Atualizar site COFINANCIAMENTO (Qualidade e vínculo)', department: 'Atenção Primária', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-022', title: 'Atualizar site COFINANCIAMENTO (Qualidade e vínculo)', department: 'Atenção Primária', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-023', title: 'Atualizar site COFINANCIAMENTO (Qualidade e vínculo)', department: 'Atenção Primária', priority: 'P0', requester: 'Delfim Moreira', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-024', title: 'Atualizar site COFINANCIAMENTO (Qualidade e vínculo)', department: 'Atenção Primária', priority: 'P0', requester: 'Itapeva', status: 'REPASSADO', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 50 },
+            { id: 'T-025', title: 'Atualizar site COFINANCIAMENTO (Qualidade e vínculo)', department: 'Atenção Primária', priority: 'P0', requester: 'Pedralva', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-026', title: 'Atualizar site POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-027', title: 'Atualizar site POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-028', title: 'Atualizar site POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-029', title: 'Atualizar site POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Delfim Moreira', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-030', title: 'Atualizar site POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-031', title: 'Atualizar site POEPS DEZEMBRO 25', department: 'Atenção Primária', priority: 'P0', requester: 'Pedralva', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-032', title: 'Atualizar site POEPS 3Q 25', department: 'Atenção Primária', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-033', title: 'Atualizar site POEPS 3Q 25', department: 'Atenção Primária', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-034', title: 'Atualizar site POEPS 3Q 25', department: 'Atenção Primária', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-035', title: 'Atualizar site POEPS 3Q 25', department: 'Atenção Primária', priority: 'P0', requester: 'Delfim Moreira', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-036', title: 'Atualizar site POEPS 3Q 25', department: 'Atenção Primária', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-037', title: 'Atualizar site POEPS 3Q 25', department: 'Atenção Primária', priority: 'P0', requester: 'Pedralva', status: 'Concluída', inclusionDate: '2025-12-27', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-038', title: 'Atualizar site PSE PLANEJAMENTO JANEIRO 26', department: 'Atenção Primária', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2025-12-30', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-039', title: 'Atualizar site PSE PLANEJAMENTO JANEIRO 26', department: 'Atenção Primária', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2025-12-30', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-040', title: 'Atualizar site PSE PLANEJAMENTO JANEIRO 26', department: 'Atenção Primária', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2025-12-30', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-041', title: 'Atualizar site PSE PLANEJAMENTO JANEIRO 26', department: 'Atenção Primária', priority: 'P0', requester: 'Delfim Moreira', status: 'Concluída', inclusionDate: '2025-12-30', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-042', title: 'Atualizar site PSE PLANEJAMENTO JANEIRO 26', department: 'Atenção Primária', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2025-12-30', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-043', title: 'Atualizar site PSE PLANEJAMENTO JANEIRO 26', department: 'Atenção Primária', priority: 'P0', requester: 'Pedralva', status: 'Concluída', inclusionDate: '2025-12-30', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-044', title: 'Atualizar site Planejamento - GITHUB', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2025-12-30', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-045', title: 'Atualizar site Manual - GITHUB', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2025-12-30', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-046', title: 'Gravar vídeo para reals MANUAL INTERATIVO', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2025-12-30', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-047', title: 'Gravar vídeo para MUNICÍPIOS - MANUAL INTERATIVO', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2025-12-30', completionDate: '2026-01-03', deadline: '', progress: 100 },
+            { id: 'T-048', title: 'Demanda KELLEN PLANEJAMENTO 2026', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2026-01-02', completionDate: '2026-01-04', deadline: '', progress: 100 },
+            { id: 'T-049', title: 'Solicitar ARLETE ENVIO DADOS INDICADORES', department: 'Atenção Primária', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-050', title: 'Solicitar ATUALIZAÇÃO ESUS FEEDBACK', department: 'Atenção Primária', priority: 'P0', requester: 'Delfim Moreira', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-051', title: 'Enviar feedback municípios', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-052', title: 'Usuário ACS Emanuela', department: 'e-SUS', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-053', title: 'Atualizar classificação indicador C7 SITE', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-054', title: 'Cadastro ACS Eleandro SÃO MATEUS', department: 'e-SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-055', title: 'Cadastro ACS Eleandro SÃO MATEUS', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-056', title: 'Verificar ESUS FORA DO AR', department: 'e-SUS', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-057', title: 'Demanda ANA PAULA PLANEJAMENTO', department: 'Atenção Primária', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-058', title: 'Verificar ações realizadas PSE 2025', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-059', title: 'Dar feedback municípios ações realizadas PSE 2025', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-06', deadline: '', progress: 100 },
+            { id: 'T-060', title: 'Alterar planejamento PSE 2026', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-06', deadline: '', progress: 100 },
+            { id: 'T-061', title: 'Cadastro ACS Fabiana PONTE NOVA', department: 'e-SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-062', title: 'Cadastro ACS Fabiana PONTE NOVA', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-063', title: 'Verificar sobre centro de convivência Cachoeira', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Em execução', inclusionDate: '2026-01-05', completionDate: '', deadline: '', progress: 50 },
+            { id: 'T-064', title: 'Verificar sobre fechamento 12/25', department: 'SIA/SUS', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-12', deadline: '', progress: 100 },
+            { id: 'T-065', title: 'Cadastro ACS Antonella CRUZEIRO', department: 'e-SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-066', title: 'Cadastro ACS Antonella CRUZEIRO', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-067', title: 'Cadastro ACS Marcia CRUZEIRO', department: 'e-SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-068', title: 'Cadastro ACS Marcia CRUZEIRO', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-069', title: 'ACS que sairam CRUZEIRO', department: 'e-SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-070', title: 'ACS que sairam CRUZEIRO', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-071', title: 'Caso médica SEM VINCULO EQUIPE', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-08', deadline: '', progress: 100 },
+            { id: 'T-072', title: 'Atualizar aquivo único', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-073', title: 'Exportar e transmitir MS', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-074', title: 'Demanda FERNANDA', department: 'SIA/SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-075', title: 'Exclusão Ana Laura Gomes de Oliveira', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-08', deadline: '', progress: 100 },
+            { id: 'T-076', title: 'Demanda Kellen relatório Saúde Bucal', department: 'e-SUS', priority: 'P1', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-077', title: 'Alterações ENVIADAS ARLETE', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-08', deadline: '', progress: 100 },
+            { id: 'T-078', title: 'Exportar e transmitir MS', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-079', title: 'Organizar arquivos recebidos email', department: 'Outros', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-080', title: 'Cadas ADM SMS REGULAÇÃO', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-081', title: 'Cadas ADM SMS REGULAÇÃO', department: 'e-SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-05', deadline: '', progress: 100 },
+            { id: 'T-082', title: 'Cadastro profissionais CAE', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Não iniciada', inclusionDate: '2026-01-05', completionDate: '', deadline: '', progress: 0 },
+            { id: 'T-083', title: 'Organizar ações prioritárias PSE', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2026-01-05', completionDate: '2026-01-06', deadline: '', progress: 100 },
+            { id: 'T-084', title: 'Demanda ABMV CIHA', department: 'CIHA', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-06', completionDate: '2026-01-06', deadline: '', progress: 100 },
+            { id: 'T-085', title: 'Incluir monitoramento PSE AÇÕES PRIORITÁRIAS', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2026-01-06', completionDate: '2026-01-06', deadline: '', progress: 100 },
+            { id: 'T-086', title: 'Agenda Geani PSICOLOGA', department: 'e-SUS', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2026-01-06', completionDate: '2026-01-06', deadline: '', progress: 100 },
+            { id: 'T-087', title: 'Importar CIHA + RELATÓRIOS', department: 'CIHA', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-06', completionDate: '2026-01-07', deadline: '', progress: 100 },
+            { id: 'T-088', title: 'Exportar e transmitir MS 12/25', department: 'CIHA', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-06', completionDate: '2026-01-07', deadline: '', progress: 100 },
+            { id: 'T-089', title: 'Cadastro AUX ADM LOTEAMENTO', department: 'e-SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-07', completionDate: '2026-01-07', deadline: '', progress: 100 },
+            { id: 'T-090', title: 'Cadastro AUX ADM LOTEAMENTO', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-07', completionDate: '2026-01-07', deadline: '', progress: 100 },
+            { id: 'T-091', title: 'Email cadastro CAE', department: 'Outros', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-07', completionDate: '2026-01-07', deadline: '', progress: 100 },
+            { id: 'T-092', title: 'Realizar cadastro CAE', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Não iniciada', inclusionDate: '2026-01-07', completionDate: '', deadline: '', progress: 0 },
+            { id: 'T-093', title: 'Feedback indicadores de qualidade', department: 'Atenção Primária', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-07', completionDate: '2026-01-07', deadline: '', progress: 100 },
+            { id: 'T-094', title: 'Demanda Adriele indicadores', department: 'Atenção Primária', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2026-01-07', completionDate: '2026-01-07', deadline: '', progress: 100 },
+            { id: 'T-095', title: 'Senha ACS Emanuela', department: 'e-SUS', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2026-01-07', completionDate: '2026-01-07', deadline: '', progress: 100 },
+            { id: 'T-096', title: 'Caso Gestante - REPASSAR SUPORTE', department: 'Atenção Primária', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2026-01-07', completionDate: '2026-01-07', deadline: '', progress: 100 },
+            { id: 'T-097', title: 'Verificar cadastro PMS 26-29 DigiSUS', department: 'Gestão', priority: 'P0', requester: 'Camanducaia', status: 'REPASSADO', inclusionDate: '2026-01-08', completionDate: '2026-01-16', deadline: '', progress: 50 },
+            { id: 'T-098', title: 'COREN LOYDI', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-08', completionDate: '2026-01-08', deadline: '', progress: 100 },
+            { id: 'T-099', title: 'Demanda RUBIA AGENDA', department: 'Atenção Primária', priority: 'P0', requester: 'Delfim Moreira', status: 'Concluída', inclusionDate: '2026-01-08', completionDate: '2026-01-08', deadline: '', progress: 100 },
+            { id: 'T-100', title: 'Atualizar aquivo único', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-08', completionDate: '2026-01-08', deadline: '', progress: 100 },
+            { id: 'T-101', title: 'Exportar e transmitir MS', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-08', completionDate: '2026-01-08', deadline: '', progress: 100 },
+            { id: 'T-102', title: 'Cadastro clínica odontológica SOLICITAÇÃO', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-08', completionDate: '2026-01-12', deadline: '', progress: 100 },
+            { id: 'T-103', title: 'Reinstalar CNES', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-08', completionDate: '2026-01-08', deadline: '', progress: 100 },
+            { id: 'T-104', title: 'Solicitar base CNES', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-08', completionDate: '2026-01-08', deadline: '', progress: 100 },
+            { id: 'T-105', title: 'Restaurar base', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-08', completionDate: '2026-01-08', deadline: '', progress: 100 },
+            { id: 'T-106', title: 'Atualizar aquivo único', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-08', completionDate: '2026-01-09', deadline: '', progress: 100 },
+            { id: 'T-107', title: 'Exportar e transmitir MS', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'REPASSADO', inclusionDate: '2026-01-08', completionDate: '2026-01-09', deadline: '', progress: 50 },
+            { id: 'T-108', title: 'Problema Tablet emanuele', department: 'Atenção Primária', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2026-01-09', completionDate: '2026-01-09', deadline: '', progress: 100 },
+            { id: 'T-109', title: 'Reunião Kellen', department: 'Outros', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2026-01-11', completionDate: '2026-01-11', deadline: '', progress: 100 },
+            { id: 'T-110', title: 'Relatórios de Busca Ativa', department: 'Atenção Primária', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-10', completionDate: '2026-01-12', deadline: '', progress: 100 },
+            { id: 'T-111', title: 'Relatórios de Busca Ativa', department: 'Atenção Primária', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-10', completionDate: '2026-01-10', deadline: '', progress: 100 },
+            { id: 'T-112', title: 'Relatórios de Busca Ativa', department: 'Atenção Primária', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2026-01-10', completionDate: '2026-01-10', deadline: '', progress: 100 },
+            { id: 'T-113', title: 'Relatórios de Busca Ativa', department: 'Atenção Primária', priority: 'P0', requester: 'Delfim Moreira', status: 'Concluída', inclusionDate: '2026-01-10', completionDate: '2026-01-11', deadline: '', progress: 100 },
+            { id: 'T-114', title: 'Relatórios Nominais', department: 'Atenção Primária', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2026-01-10', completionDate: '2026-01-11', deadline: '', progress: 100 },
+            { id: 'T-115', title: 'Relatórios de Busca Ativa', department: 'Atenção Primária', priority: 'P0', requester: 'Pedralva', status: 'Concluída', inclusionDate: '2026-01-10', completionDate: '2026-01-11', deadline: '', progress: 100 },
+            { id: 'T-116', title: 'Enviar relatórios municípios', department: 'Atenção Primária', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2026-01-12', completionDate: '2026-01-12', deadline: '', progress: 100 },
+            { id: 'T-117', title: 'Senha ACS Emanuela', department: 'e-SUS', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2026-01-12', completionDate: '2026-01-12', deadline: '', progress: 100 },
+            { id: 'T-118', title: 'Senha Vanderleia', department: 'e-SUS', priority: 'P0', requester: 'Itapeva', status: 'Concluída', inclusionDate: '2026-01-12', completionDate: '2026-01-12', deadline: '', progress: 100 },
+            { id: 'T-119', title: 'Cadastro ACS LARISSA SÃO MATEUS', department: 'e-SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-12', completionDate: '2026-01-12', deadline: '', progress: 100 },
+            { id: 'T-120', title: 'Cadastro ACS LARISSA SÃO MATEUS', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-12', completionDate: '2026-01-12', deadline: '', progress: 100 },
+            { id: 'T-121', title: 'BCK CNES', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-12', completionDate: '2026-01-12', deadline: '', progress: 100 },
+            { id: 'T-122', title: 'BCK CNES', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-12', completionDate: '2026-01-12', deadline: '', progress: 100 },
+            { id: 'T-123', title: 'Cadastro LRPD - VERIFICAR MUDANÇA DE FAIXA', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-12', completionDate: '2026-01-16', deadline: '', progress: 100 },
+            { id: 'T-124', title: 'Acesso ELEANDRO ACS', department: 'e-SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-13', completionDate: '2026-01-13', deadline: '', progress: 100 },
+            { id: 'T-125', title: 'Acesso ANA PAULA', department: 'e-SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-13', completionDate: '2026-01-13', deadline: '', progress: 100 },
+            { id: 'T-126', title: 'Demanda Kellen relatórios', department: 'e-SUS', priority: 'P0', requester: 'Salto na Gestão', status: 'Concluída', inclusionDate: '2026-01-14', completionDate: '2026-01-14', deadline: '', progress: 100 },
+            { id: 'T-127', title: 'Instalar sistemas', department: 'BPA / FPO', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-14', completionDate: '2026-01-14', deadline: '', progress: 100 },
+            { id: 'T-128', title: 'Atualizar versão sistemas', department: 'BPA / FPO', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-14', completionDate: '2026-01-14', deadline: '', progress: 100 },
+            { id: 'T-129', title: 'PMS Camanducaia Digisus', department: 'Outros', priority: 'P0', requester: 'Camanducaia', status: 'REPASSADO', inclusionDate: '2026-01-14', completionDate: '2026-01-15', deadline: '', progress: 50 },
+            { id: 'T-130', title: 'Atualizar sistemas 11/25', department: 'BPA / FPO', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-14', completionDate: '2026-01-16', deadline: '', progress: 100 },
+            { id: 'T-131', title: 'FPO UBS 11/25', department: 'BPA / FPO', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Não iniciada', inclusionDate: '2026-01-14', completionDate: '', deadline: '', progress: 0 },
+            { id: 'T-132', title: 'FPO LABORATORIO 11/25', department: 'BPA / FPO', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Não iniciada', inclusionDate: '2026-01-14', completionDate: '', deadline: '', progress: 0 },
+            { id: 'T-133', title: 'Mandar vídeo cadastro clínica vanessa.', department: 'CNES', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-14', completionDate: '2026-01-14', deadline: '', progress: 100 },
+            { id: 'T-134', title: 'Alterar acessos terezinha', department: 'CNES', priority: 'P0', requester: 'Cachoeira de Minas', status: 'Concluída', inclusionDate: '2026-01-14', completionDate: '2026-01-16', deadline: '', progress: 100 },
+            { id: 'T-135', title: 'Atualizar SIHD2 12/25', department: 'SIH/SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-15', completionDate: '2026-01-16', deadline: '', progress: 100 },
+            { id: 'T-136', title: 'Atualizar aquivos SIHD2 12/25', department: 'SIH/SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-15', completionDate: '2026-01-16', deadline: '', progress: 100 },
+            { id: 'T-137', title: 'Importar arquivo + inconsistencias Alyne', department: 'SIH/SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-15', completionDate: '2026-01-16', deadline: '', progress: 100 },
+            { id: 'T-138', title: 'Atualizar sistemas 12/25', department: 'BPA / FPO', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-15', completionDate: '2026-01-16', deadline: '', progress: 100 },
+            { id: 'T-139', title: 'Atualizar arquivos 12/25', department: 'BPA / FPO', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-15', completionDate: '2026-01-16', deadline: '', progress: 100 },
+            { id: 'T-140', title: 'Reimportar arquivo AIH 12/25', department: 'SIH/SUS', priority: 'P0', requester: 'Camanducaia', status: 'Concluída', inclusionDate: '2026-01-16', completionDate: '2026-01-16', deadline: '', progress: 100 },
+            { id: 'T-141', title: 'Exportação + relatórios 12/25', department: 'SIH/SUS', priority: 'P0', requester: 'Camanducaia', status: 'Não iniciada', inclusionDate: '2026-01-16', completionDate: '', deadline: '', progress: 0 },
+            { id: 'T-142', title: 'Transmitir MS 12/25', department: 'SIH/SUS', priority: 'P0', requester: 'Camanducaia', status: 'Não iniciada', inclusionDate: '2026-01-16', completionDate: '', deadline: '', progress: 0 },
+            { id: 'T-143', title: 'Dúvida ABMV CASSIA', department: 'BPA / FPO', priority: 'P0', requester: 'Camanducaia', status: 'Em execução', inclusionDate: '2026-01-15', completionDate: '2026-01-15', deadline: '', progress: 50 },
+            { id: 'T-144', title: 'Duvida gestante ANA PAULA', department: 'Atenção Primária', priority: 'P0', requester: 'Córrego do Bom Jesus', status: 'Concluída', inclusionDate: '2026-01-16', completionDate: '2026-01-16', deadline: '', progress: 100 },
+            { id: 'T-145', title: 'Verificar emulti DELFIM', department: 'Atenção Primária', priority: 'P0', requester: 'Delfim Moreira', status: 'Não iniciada', inclusionDate: '2026-01-16', completionDate: '', deadline: '', progress: 0 },
+            { id: 'T-146', title: 'Testar BPA Esus Feedback', department: 'BPA / FPO', priority: 'P0', requester: 'Delfim Moreira', status: 'Não iniciada', inclusionDate: '2026-01-16', completionDate: '', deadline: '', progress: 0 }
+        ];
+
+        // --- CONFIGURAÇÃO FIREBASE ---
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // --- ESTADO ---
+        let demands = []; // Inicia vazio, será preenchido pelo Firestore
+        let state = {
+            filterStatus: ['Todos'], 
+            filterMunicipality: 'Todos',
+            filterCompetence: ['Todos'], 
+            dashboardFilterMunicipality: 'Todos',
+            dashboardFilterCompetence: ['Todos'],
+            searchTerm: '',
+            activeTab: 'dashboard', 
+            sortConfig: { key: null, direction: 'asc' }, 
+            chartMunicipality: null,
+            chartSystem: null
+        };
+
+        // --- INICIALIZAÇÃO E AUTH ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initAuth();
+            lucide.createIcons();
+            
+            // Listeners da UI
+            document.getElementById('searchInput').addEventListener('input', (e) => { state.searchTerm = e.target.value; renderApp(); });
+            document.getElementById('municipalityFilter').addEventListener('change', (e) => { state.filterMunicipality = e.target.value; renderApp(); });
+            document.getElementById('dashboardMunicipalityFilter').addEventListener('change', (e) => { state.dashboardFilterMunicipality = e.target.value; renderApp(); });
+            document.getElementById('demandForm').addEventListener('submit', (e) => { e.preventDefault(); handleFormSubmit(new FormData(e.target)); });
+            
+            // Monitoramento de conexão
+            window.addEventListener('online', updateConnectionStatus);
+            window.addEventListener('offline', updateConnectionStatus);
+        });
+
+        function updateConnectionStatus() {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const statusSubtext = document.getElementById('statusSubtext');
+            const statusBox = document.getElementById('statusBox');
+
+            if (navigator.onLine) {
+                statusDot.className = "w-2 h-2 bg-green-500 rounded-full animate-pulse";
+                statusText.textContent = "Online";
+                statusSubtext.textContent = "Sincronização ativa";
+                statusText.className = "text-xs text-green-700 font-medium";
+                statusBox.classList.remove('border-red-100', 'bg-red-50');
+                statusBox.classList.add('border-pink-100', 'from-pink-50', 'to-purple-50');
+            } else {
+                statusDot.className = "w-2 h-2 bg-red-500 rounded-full";
+                statusText.textContent = "Offline";
+                statusSubtext.textContent = "Salvando localmente...";
+                statusText.className = "text-xs text-red-700 font-medium";
+                statusBox.classList.remove('border-pink-100', 'from-pink-50', 'to-purple-50');
+                statusBox.classList.add('border-red-100', 'bg-red-50');
+            }
+        }
+
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Erro na autenticação:", error);
+                document.getElementById('loading-overlay').innerHTML = `<p class="text-red-500 font-bold p-4 bg-white rounded-lg shadow">Erro de conexão. Recarregue a página.</p>`;
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    setupRealtimeListener();
+                    updateConnectionStatus(); // Atualiza status inicial
+                }
+            });
+        }
+
+        // --- FIRESTORE LISTENERS ---
+        function setupRealtimeListener() {
+            // Caminho público para este appId para persistência global
+            const q = collection(db, 'artifacts', appId, 'public', 'data', 'demands');
+            
+            onSnapshot(q, async (snapshot) => {
+                const loadingOverlay = document.getElementById('loading-overlay');
+                
+                // Carga Inicial de Dados se o banco estiver vazio
+                if (snapshot.empty && demands.length === 0) {
+                     // Upload em lote dos dados padrão apenas na primeira vez
+                     const batch = writeBatch(db);
+                     defaultDemands.forEach(docData => {
+                         const newDocRef = doc(q); 
+                         batch.set(newDocRef, { ...docData, firestoreId: newDocRef.id });
+                     });
+                     await batch.commit();
+                     return;
+                }
+
+                demands = [];
+                snapshot.forEach((doc) => {
+                    demands.push({ ...doc.data(), firestoreId: doc.id });
+                });
+
+                // Ordenação para manter os mais recentes no topo (ID decrescente)
+                demands.sort((a, b) => {
+                     // Extrai número do ID ex: T-146 -> 146
+                     const idA = parseInt((a.id || "").replace(/\D/g,'')) || 0;
+                     const idB = parseInt((b.id || "").replace(/\D/g,'')) || 0;
+                     return idB - idA;
+                });
+
+                // Renderiza UI
+                renderMunicipalityFilters();
+                renderCompetenceFilters();
+                renderDashboardFilters();
+                renderApp();
+
+                if (loadingOverlay) loadingOverlay.style.display = 'none';
+                
+                // Feedback visual de sincronização
+                const statusSubtext = document.getElementById('statusSubtext');
+                if(statusSubtext) {
+                    const originalText = statusSubtext.textContent;
+                    statusSubtext.textContent = "Dados atualizados!";
+                    setTimeout(() => { statusSubtext.textContent = "Sincronização ativa"; }, 2000);
+                }
+
+            }, (error) => {
+                console.error("Erro ao sincronizar dados:", error);
+                // document.getElementById('loading-overlay').innerHTML = `<p class="text-red-500 font-bold p-4 bg-white rounded-lg shadow">Erro de sincronização. Verifique sua internet.</p>`;
+            });
+        }
+
+        // --- FUNÇÕES DA LÓGICA DE NEGÓCIO ---
+
+        window.handleFormSubmit = async function(formData) {
+            const firestoreId = formData.get('firestoreId');
+            const displayId = formData.get('id'); // T-XXX
+            const status = formData.get('status');
+            let progress = status === 'Concluída' ? 100 : (status === 'Em execução' ? 50 : 0);
+            
+            // Dados do formulário
+            const formPayload = {
+                title: formData.get('title'),
+                requester: formData.get('requester'),
+                department: formData.get('department'),
+                priority: formData.get('priority'),
+                status: status,
+                inclusionDate: formData.get('inclusionDate'),
+                deadline: formData.get('deadline'),
+                completionDate: formData.get('completionDate'),
+                progress: progress,
+            };
+
+            const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'demands');
+
+            try {
+                // Feedback visual de salvamento
+                const btnSubmit = document.querySelector('#demandForm button[type="submit"]');
+                const originalText = btnSubmit.textContent;
+                btnSubmit.textContent = "Salvando...";
+                btnSubmit.disabled = true;
+
+                if (firestoreId) {
+                    // Edição
+                    const docRef = doc(collectionRef, firestoreId);
+                    await updateDoc(docRef, formPayload);
+                } else {
+                    // Criação
+                    // Gera novo ID T-XXX baseado no maior ID existente
+                    let maxId = 0;
+                    demands.forEach(d => {
+                        const num = parseInt((d.id || "").replace(/\D/g,'')) || 0;
+                        if (num > maxId) maxId = num;
+                    });
+                    const newDisplayId = `T-${String(maxId + 1).padStart(3, '0')}`;
+                    
+                    await addDoc(collectionRef, {
+                        ...formPayload,
+                        id: newDisplayId
+                    });
+                }
+                closeModal();
+            } catch (e) {
+                console.error("Erro ao salvar:", e);
+                alert("Erro ao salvar. Verifique sua conexão.");
+            } finally {
+                const btnSubmit = document.querySelector('#demandForm button[type="submit"]');
+                if(btnSubmit) {
+                    btnSubmit.textContent = "Salvar";
+                    btnSubmit.disabled = false;
+                }
+            }
+        }
+
+        // --- FUNÇÕES DE UI ---
+
+        window.editDemand = function(id) { // id visual (T-XXX)
+            const item = demands.find(d => d.id === id);
+            if (!item) return;
+            
+            // Preenche campos ocultos
+            document.getElementById('demandId').value = item.id;
+            document.getElementById('firestoreId').value = item.firestoreId || ''; 
+
+            document.getElementById('inputTitle').value = item.title;
+            document.getElementById('inputDepartment').value = item.department || 'Atenção Primária';
+            document.getElementById('modalMunicipality').value = item.requester || '';
+            document.getElementById('inputPriority').value = item.priority || 'P2';
+            document.getElementById('inputStatus').value = item.status || 'Não iniciada';
+            document.getElementById('inputInclusionDate').value = item.inclusionDate || '';
+            document.getElementById('inputDeadline').value = item.deadline || '';
+            document.getElementById('inputCompletionDate').value = item.completionDate || '';
+            
+            document.getElementById('modalTitle').textContent = `Editar Tarefa (${item.id})`;
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modal').classList.add('flex');
+        }
+
+        // --- LÓGICA DE FILTROS E RENDERIZAÇÃO ---
+
+        window.toggleFilterDropdown = function(event, type) {
+            event.stopPropagation();
+            let dropdownId;
+            if (type === 'status') dropdownId = 'filterDropdownStatus';
+            else if (type === 'competence') dropdownId = 'filterDropdownCompetence';
+            else if (type === 'dashboardCompetence') dropdownId = 'filterDropdownDashboardCompetence'; 
+
+            const dropdown = document.getElementById(dropdownId);
+            const allDropdowns = document.querySelectorAll('.dropdown-enter');
+            allDropdowns.forEach(d => {
+                if (d.id !== dropdownId && !d.classList.contains('hidden')) {
+                    d.classList.add('hidden');
+                    d.classList.remove('dropdown-enter-active');
+                }
+            });
+
+            if (dropdown.classList.contains('hidden')) {
+                dropdown.classList.remove('hidden');
+                dropdown.classList.add('dropdown-enter-active');
+            } else {
+                dropdown.classList.add('hidden');
+                dropdown.classList.remove('dropdown-enter-active');
+            }
+        }
+
+        window.handleStatusChange = function(checkbox) {
+            const value = checkbox.value;
+            const isChecked = checkbox.checked;
+            updateMultiSelectState('filterStatus', value, isChecked, 'filterDropdownStatus');
+            updateBadge('statusCountBadge', state.filterStatus);
+            renderApp();
+        }
+
+        window.handleCompetenceChange = function(checkbox) {
+            const value = checkbox.value;
+            const isChecked = checkbox.checked;
+            updateMultiSelectState('filterCompetence', value, isChecked, 'filterDropdownCompetence');
+            updateBadge('competenceCountBadge', state.filterCompetence);
+            renderApp();
+        }
+
+        window.handleDashboardCompetenceChange = function(checkbox) {
+            const value = checkbox.value;
+            const isChecked = checkbox.checked;
+            updateMultiSelectState('dashboardFilterCompetence', value, isChecked, 'filterDropdownDashboardCompetence');
+            updateBadge('dashboardCompetenceCountBadge', state.dashboardFilterCompetence);
+            renderApp();
+        }
+
+        function updateMultiSelectState(stateKey, value, isChecked, dropdownId) {
+            if (value === 'Todos') {
+                if (isChecked) {
+                    state[stateKey] = ['Todos'];
+                    document.querySelectorAll(`#${dropdownId} input[type="checkbox"]`).forEach(cb => {
+                        if (cb.value !== 'Todos') cb.checked = false;
+                    });
+                } else {
+                    if (state[stateKey].length === 1 && state[stateKey][0] === 'Todos') {
+                        document.querySelector(`#${dropdownId} input[value="Todos"]`).checked = true;
+                        return;
+                    }
+                    state[stateKey] = state[stateKey].filter(s => s !== 'Todos');
+                }
+            } else {
+                if (isChecked) {
+                    state[stateKey] = state[stateKey].filter(s => s !== 'Todos');
+                    document.querySelector(`#${dropdownId} input[value="Todos"]`).checked = false;
+                    if (!state[stateKey].includes(value)) state[stateKey].push(value);
+                } else {
+                    state[stateKey] = state[stateKey].filter(s => s !== value);
+                }
+            }
+            if (state[stateKey].length === 0) {
+                state[stateKey] = ['Todos'];
+                document.querySelector(`#${dropdownId} input[value="Todos"]`).checked = true;
+            }
+        }
+
+        function updateBadge(badgeId, filterArray) {
+            const badge = document.getElementById(badgeId);
+            const count = filterArray.length;
+            if (filterArray.includes('Todos')) {
+                badge.classList.add('hidden');
+            } else {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            }
+        }
+
+        window.handleSort = function(key) {
+            let direction = 'asc';
+            if (state.sortConfig.key === key && state.sortConfig.direction === 'asc') {
+                direction = 'desc';
+            }
+            state.sortConfig = { key, direction };
+            renderApp();
+        }
+
+        function sortData(data) {
+            if (!state.sortConfig.key) return data;
+            return [...data].sort((a, b) => {
+                let aValue = a[state.sortConfig.key];
+                let bValue = b[state.sortConfig.key];
+                if (state.sortConfig.key === 'priority') {
+                    const priorityOrder = { 'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3 };
+                    aValue = priorityOrder[aValue] !== undefined ? priorityOrder[aValue] : 99;
+                    bValue = priorityOrder[bValue] !== undefined ? priorityOrder[bValue] : 99;
+                } else {
+                    if (aValue === null || aValue === undefined) aValue = '';
+                    if (bValue === null || bValue === undefined) bValue = '';
+                    aValue = aValue.toString().toLowerCase();
+                    bValue = bValue.toString().toLowerCase();
+                }
+                if (aValue < bValue) return state.sortConfig.direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return state.sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        function getCompetenceKey(dateString) {
+            if (!dateString) return 'Sem Data';
+            return dateString.substring(0, 7);
+        }
+
+        function formatCompetenceLabel(competenceKey) {
+            if (competenceKey === 'Sem Data') return 'Sem Data';
+            const [year, month] = competenceKey.split('-');
+            const date = new Date(year, month - 1); 
+            const monthName = date.toLocaleString('pt-BR', { month: 'long' });
+            const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+            return `${capitalizedMonth}/${year}`;
+        }
+
+        window.switchTab = function(tab) {
+            state.activeTab = tab;
+            const btnList = document.getElementById('btn-list');
+            const btnDash = document.getElementById('btn-dashboard');
+            const dashboardView = document.getElementById('dashboard-view');
+            const listView = document.getElementById('list-view');
+            const title = document.getElementById('page-title');
+
+            if (tab === 'list') {
+                btnList.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors bg-[#940969]/10 text-[#940969] shadow-sm';
+                btnList.classList.remove('text-gray-600', 'hover:bg-gray-50');
+                btnDash.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50';
+                dashboardView.classList.add('hidden');
+                listView.classList.remove('hidden');
+                title.textContent = 'Gerenciamento de Tarefas';
+            } else {
+                btnDash.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors bg-[#940969]/10 text-[#940969] shadow-sm';
+                btnDash.classList.remove('text-gray-600', 'hover:bg-gray-50');
+                btnList.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50';
+                listView.classList.add('hidden');
+                dashboardView.classList.remove('hidden');
+                title.textContent = 'Painel de Tarefas';
+            }
+            renderApp();
+        }
+
+        function updateCardValue(id, newValue) {
+            const element = document.getElementById(id);
+            if (element.textContent != newValue) {
+                element.textContent = newValue;
+                element.classList.remove('value-updated');
+                void element.offsetWidth;
+                element.classList.add('value-updated');
+            }
+        }
+
+        function renderApp() {
+            const dashboardData = getFilteredDashboardDemands();
+            const stats = calculateStats(dashboardData);
+            
+            updateCardValue('card-total', stats.total);
+            updateCardValue('card-pending', stats.pending);
+            updateCardValue('card-execution', stats.inProgress);
+            updateCardValue('card-completed', stats.completed);
+            updateCardValue('card-urgent', stats.urgent);
+            
+            document.getElementById('card-avg-time').textContent = stats.avgTime + ' dias';
+            document.getElementById('card-on-time').textContent = stats.onTime;
+            document.getElementById('card-overdue').textContent = stats.overdue;
+
+            if (state.activeTab === 'dashboard') {
+                renderCharts(dashboardData); 
+            }
+
+            let listData = getFilteredDemands();
+            listData = sortData(listData);
+            renderTable(listData);
+            document.getElementById('resultsCount').textContent = `Mostrando ${listData.length} de ${demands.length} resultados`;
+            
+            lucide.createIcons();
+        }
+
+        function getFilteredDashboardDemands() {
+            return demands.filter(item => {
+                const matchesMunicipality = state.dashboardFilterMunicipality === 'Todos' || item.requester === state.dashboardFilterMunicipality;
+                const itemCompetence = getCompetenceKey(item.inclusionDate);
+                const matchesCompetence = state.dashboardFilterCompetence.includes('Todos') || state.dashboardFilterCompetence.includes(itemCompetence);
+                return matchesMunicipality && matchesCompetence;
+            });
+        }
+
+        function getFilteredDemands() {
+            return demands.filter(item => {
+                const matchesStatus = state.filterStatus.includes('Todos') || state.filterStatus.includes(item.status);
+                const matchesMunicipality = state.filterMunicipality === 'Todos' || item.requester === state.filterMunicipality;
+                const itemCompetence = getCompetenceKey(item.inclusionDate);
+                const matchesCompetence = state.filterCompetence.includes('Todos') || state.filterCompetence.includes(itemCompetence);
+                const searchLower = state.searchTerm.toLowerCase();
+                const matchesSearch = 
+                    (item.title && item.title.toLowerCase().includes(searchLower)) || 
+                    (item.requester && item.requester.toLowerCase().includes(searchLower)) ||
+                    (item.department && item.department.toLowerCase().includes(searchLower));
+                return matchesStatus && matchesMunicipality && matchesCompetence && matchesSearch;
+            });
+        }
+
+        function calculateStats(data) {
+            let totalTime = 0;
+            let countTime = 0;
+            let onTime = 0;
+            let overdue = 0;
+
+            data.forEach(d => {
+                if (d.inclusionDate && d.completionDate) {
+                    const start = new Date(d.inclusionDate);
+                    const end = new Date(d.completionDate);
+                    const diffTime = Math.abs(end - start);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                    totalTime += diffDays;
+                    countTime++;
+                }
+                if (d.status === 'Concluída' && d.completionDate && d.deadline) {
+                    const conclusion = new Date(d.completionDate);
+                    const deadline = new Date(d.deadline);
+                    conclusion.setHours(0,0,0,0);
+                    deadline.setHours(0,0,0,0);
+                    if (conclusion <= deadline) onTime++;
+                    else overdue++;
+                }
+            });
+
+            const avgTime = countTime > 0 ? Math.round(totalTime / countTime) : 0;
+            return {
+                total: data.length,
+                completed: data.filter(d => d.status === 'Concluída').length,
+                inProgress: data.filter(d => d.status === 'Em execução').length,
+                pending: data.filter(d => d.status === 'Não iniciada').length,
+                urgent: data.filter(d => d.priority === 'P0' && d.status !== 'Concluída').length,
+                avgTime,
+                onTime,
+                overdue
+            };
+        }
+
+        function renderDashboardFilters() {
+            let municipalities = [...new Set(demands.map(d => d.requester || 'Não informado'))].sort();
+            municipalities.unshift('Todos');
+            const dashMuniSelect = document.getElementById('dashboardMunicipalityFilter');
+            dashMuniSelect.innerHTML = municipalities.map(m => `<option value="${m}">${m}</option>`).join('');
+
+            const competences = ['Todos', ...new Set(
+                demands.filter(d => d.inclusionDate).map(d => getCompetenceKey(d.inclusionDate))
+            )].sort().reverse();
+            
+            const dashCompList = document.getElementById('dashboardCompetenceList');
+            dashCompList.innerHTML = competences.map(key => {
+                const label = key === 'Todos' ? 'Todos' : formatCompetenceLabel(key);
+                return `
+                    <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                        <input type="checkbox" value="${key}" ${key === 'Todos' ? 'checked' : ''} onchange="handleDashboardCompetenceChange(this)" class="custom-checkbox w-4 h-4 rounded border-gray-300 text-[#940969] focus:ring-[#940969]">
+                        <span class="text-sm text-gray-700">${label}</span>
+                    </label>
+                `;
+            }).join('') + '<div class="h-px bg-gray-100 my-1"></div>';
+        }
+
+        function renderMunicipalityFilters() {
+            let municipalities = [...new Set(demands.map(d => d.requester || 'Não informado'))].sort();
+            municipalities.unshift('Todos');
+            const filterSelect = document.getElementById('municipalityFilter');
+            const modalSelect = document.getElementById('modalMunicipality');
+            
+            filterSelect.innerHTML = municipalities.map(m => `<option value="${m}">${m}</option>`).join('');
+            
+            modalSelect.innerHTML = `<option value="" disabled selected>Selecione...</option>` + 
+                municipalities.filter(m => m !== 'Todos').map(m => `<option value="${m}">${m}</option>`).join('') +
+                `<option value="Outro">Outro / Geral</option>`;
+        }
+
+        function renderCompetenceFilters() {
+            const competences = ['Todos', ...new Set(demands.filter(d => d.inclusionDate).map(d => getCompetenceKey(d.inclusionDate)))].sort().reverse(); 
+            const container = document.getElementById('competenceList');
+            container.innerHTML = competences.map(key => {
+                const label = key === 'Todos' ? 'Todos' : formatCompetenceLabel(key);
+                return `
+                    <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                        <input type="checkbox" value="${key}" ${key === 'Todos' ? 'checked' : ''} onchange="handleCompetenceChange(this)" class="custom-checkbox w-4 h-4 rounded border-gray-300 text-[#940969] focus:ring-[#940969]">
+                        <span class="text-sm text-gray-700">${label}</span>
+                    </label>
+                `;
+            }).join('') + '<div class="h-px bg-gray-100 my-1"></div>';
+        }
+
+        function renderCharts(data) {
+            const municipalityCount = {};
+            const systemCount = {};
+            
+            data.forEach(d => {
+                const muni = d.requester || 'Não informado';
+                municipalityCount[muni] = (municipalityCount[muni] || 0) + 1;
+                const sys = d.department || 'Outros';
+                systemCount[sys] = (systemCount[sys] || 0) + 1;
+            });
+
+            const sortedMuni = Object.entries(municipalityCount).sort(([,a], [,b]) => b - a);
+            const muniLabels = sortedMuni.map(([label]) => label);
+            const muniValues = sortedMuni.map(([,value]) => value);
+            const ctxMuni = document.getElementById('chartMunicipality').getContext('2d');
+            if (state.chartMunicipality) state.chartMunicipality.destroy();
+            state.chartMunicipality = new Chart(ctxMuni, {
+                type: 'bar',
+                data: {
+                    labels: muniLabels,
+                    datasets: [{ label: 'Tarefas', data: muniValues, backgroundColor: '#940969', borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } }
+                }
+            });
+
+            const sysLabels = Object.keys(systemCount);
+            const sysValues = Object.values(systemCount);
+            const ctxSys = document.getElementById('chartSystem').getContext('2d');
+            if (state.chartSystem) state.chartSystem.destroy();
+            const colors = ['#940969', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6366f1', '#84cc16'];
+            state.chartSystem = new Chart(ctxSys, {
+                type: 'doughnut',
+                data: {
+                    labels: sysLabels,
+                    datasets: [{ data: sysValues, backgroundColor: colors, borderWidth: 0 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="px-6 py-16 text-center text-gray-400 bg-gray-50/50"><div class="flex flex-col items-center gap-3"><div class="bg-gray-100 p-4 rounded-full"><i data-lucide="search" class="w-8 h-8 text-gray-400"></i></div><p class="font-medium text-gray-600">Nenhuma tarefa encontrada</p></div></td></tr>`;
+                return;
+            }
+            tbody.innerHTML = data.map(item => `
+                <tr class="hover:bg-gray-50 transition-colors group">
+                    <td class="px-6 py-4">
+                        <span class="text-[10px] text-gray-400 font-mono block mb-1">${item.id}</span>
+                        <div class="font-medium text-gray-900 line-clamp-2" title="${item.title}">${item.title}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-1.5 text-gray-900 font-medium">
+                                <i data-lucide="building-2" class="w-3.5 h-3.5 text-gray-400"></i>
+                                ${getMunicipalityBadge(item.requester || 'N/A')}
+                            </div>
+                            <div class="flex items-center gap-1.5 text-xs text-gray-500">
+                                <i data-lucide="tag" class="w-3 h-3 text-gray-400"></i>
+                                <span class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">${item.department || 'Geral'}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center">${getPriorityBadge(item.priority)}</td>
+                    <td class="px-6 py-4 text-center"><div class="flex justify-center">${getStatusBadge(item.status)}</div></td>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">${item.inclusionDate ? `<div class="text-sm text-gray-600">${new Date(item.inclusionDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>` : '<span class="text-gray-300 text-xs italic">-</span>'}</td>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">${item.deadline ? `<div class="flex items-center justify-end gap-1.5 text-gray-600 bg-gray-50 px-2 py-1 rounded inline-block"><i data-lucide="calendar" class="w-3.5 h-3.5"></i>${new Date(item.deadline).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>` : '<span class="text-gray-300 text-xs italic">-</span>'}</td>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">${item.completionDate ? `<div class="flex items-center justify-end gap-1.5 text-gray-600 bg-gray-50 px-2 py-1 rounded inline-block"><i data-lucide="check-square" class="w-3.5 h-3.5 text-green-600"></i>${new Date(item.completionDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>` : '<span class="text-gray-300 text-xs italic">-</span>'}</td>
+                    <td class="px-6 py-4 text-right relative">
+                        <button onclick="toggleDropdown(event, '${item.id}')" class="text-gray-400 hover:text-[#940969] p-1 hover:bg-pink-50 rounded transition-colors focus:outline-none"><i data-lucide="more-vertical" class="w-4 h-4"></i></button>
+                        <div id="dropdown-${item.id}" class="hidden absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-xl border border-gray-100 z-10 overflow-hidden text-left dropdown-enter">
+                            <button onclick="editDemand('${item.id}')" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#940969] flex items-center gap-2"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i> Editar</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        window.toggleDropdown = function(event, id) {
+            event.stopPropagation();
+            const dropdown = document.getElementById(`dropdown-${id}`);
+            document.querySelectorAll('.dropdown-enter-active').forEach(d => { if(!d.id.includes(id)) d.classList.add('hidden'); });
+            document.querySelectorAll('[id^="dropdown-"]').forEach(d => { if(d.id !== `dropdown-${id}`) d.classList.add('hidden'); });
+            if (dropdown.classList.contains('hidden')) { dropdown.classList.remove('hidden'); dropdown.classList.add('dropdown-enter-active'); } 
+            else { dropdown.classList.add('hidden'); }
+        }
+
+        window.closeAllDropdowns = function(event) {
+            document.querySelectorAll('[id^="dropdown-"]').forEach(d => d.classList.add('hidden'));
+            if (!event.target.closest('#filterDropdownStatus') && !event.target.closest('#filterDropdownCompetence') && !event.target.closest('#filterDropdownDashboardCompetence') && !event.target.closest('button')) {
+                document.querySelectorAll('.dropdown-enter-active').forEach(d => d.classList.add('hidden'));
+            }
+        }
+
+        window.openModal = function() {
+            document.getElementById('demandForm').reset();
+            document.getElementById('demandId').value = ''; 
+            document.getElementById('firestoreId').value = ''; 
+            document.getElementById('modalTitle').textContent = 'Nova Tarefa';
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modal').classList.add('flex');
+        }
+
+        window.closeModal = function() {
+            document.getElementById('modal').classList.add('hidden');
+            document.getElementById('modal').classList.remove('flex');
+        }
+
+        function getStatusBadge(status) {
+            const styles = { 'Concluída': 'bg-green-100 text-green-700 border-green-200', 'Em execução': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'Não iniciada': 'bg-orange-100 text-orange-700 border-orange-200', 'REPASSADO': 'bg-indigo-100 text-indigo-700 border-indigo-200' };
+            const icons = { 'Concluída': 'check-circle-2', 'Em execução': 'clock', 'Não iniciada': 'alert-circle', 'REPASSADO': 'arrow-right-circle' };
+            return `<span class="flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles['Não iniciada']}"><i data-lucide="${icons[status] || 'alert-circle'}" class="w-3 h-3 mr-1"></i> ${status}</span>`;
+        }
+
+        function getPriorityBadge(priority) {
+            const styles = { 'P0': 'bg-red-100 text-red-700 border border-red-200', 'P1': 'bg-orange-50 text-orange-700 border border-orange-200', 'P2': 'bg-yellow-50 text-yellow-700 border border-yellow-200', 'P3': 'bg-blue-50 text-blue-700 border border-blue-200' };
+            const labels = { 'P0': 'P0 - Urgente', 'P1': 'P1 - Alta', 'P2': 'P2 - Média', 'P3': 'P3 - Baixa' };
+            return `<span class="px-2 py-1 rounded text-xs font-bold whitespace-nowrap ${styles[priority] || 'bg-gray-50 text-gray-600'}">${labels[priority] || priority}</span>`;
+        }
+
+        function getMunicipalityBadge(municipality) {
+            const styles = { 'Cachoeira de Minas': 'bg-cyan-100 text-cyan-700 border-cyan-200', 'Camanducaia': 'bg-indigo-100 text-indigo-700 border-indigo-200', 'Córrego do Bom Jesus': 'bg-emerald-100 text-emerald-700 border-emerald-200', 'Delfim Moreira': 'bg-violet-100 text-violet-700 border-violet-200', 'Itapeva': 'bg-rose-100 text-rose-700 border-rose-200', 'Pedralva': 'bg-amber-100 text-amber-700 border-amber-200', 'Salto na Gestão': 'bg-slate-100 text-slate-700 border-slate-200' };
+            return `<span class="inline-block px-2 py-0.5 rounded text-xs font-semibold border ${styles[municipality] || 'bg-gray-100 text-gray-700 border-gray-200'}">${municipality}</span>`;
+        }
+    </script>
+</body>
+</html>
