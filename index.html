@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Gestão - Júlia Ribeiro</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js para Gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.2s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .slide-up { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        @keyframes pulse-update {
+            0% { opacity: 1; }
+            50% { color: #940969; opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+        .value-updated { animation: pulse-update 0.4s ease-in-out; }
+
+        .bg-julia { background-color: #940969; }
+        .text-julia { color: #940969; }
+        .border-julia { border-color: #940969; }
+        
+        .dropdown-enter { opacity: 0; transform: scale(0.95); }
+        .dropdown-enter-active { opacity: 1; transform: scale(1); transition: opacity 100ms ease-out, transform 100ms ease-out; }
+
+        .custom-checkbox:checked { background-color: #940969; border-color: #940969; }
+        
+        th.sortable { cursor: pointer; transition: background-color 0.2s; user-select: none; }
+        th.sortable:hover { background-color: #740652; }
+
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.95); z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+            flex-direction: column; text-align: center; padding: 20px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 h-screen flex overflow-hidden" onclick="closeAllDropdowns(event)">
+
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#940969]"></div>
+        <p class="mt-4 text-[#940969] font-medium animate-pulse">Sincronizando com seu Firebase...</p>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col flex-shrink-0">
+        <div class="p-6 flex items-center gap-3 border-b border-gray-100">
+            <div class="w-8 h-8 bg-[#940969] rounded-lg flex items-center justify-center shadow-sm">
+                <i data-lucide="layout-dashboard" class="text-white w-5 h-5"></i>
+            </div>
+            <span class="font-bold text-lg text-gray-800 tracking-tight">Júlia Ribeiro</span>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-2">
+            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50">
+                <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                Painel Geral
+            </button>
+            <button onclick="switchTab('list')" id="btn-list" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors bg-[#940969]/10 text-[#940969] shadow-sm">
+                <i data-lucide="list-todo" class="w-5 h-5"></i>
+                Lista de Tarefas
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-gray-100">
+            <div class="bg-gradient-to-br from-pink-50 to-purple-50 p-4 rounded-xl border border-pink-100 transition-colors" id="statusBox">
+                <h4 class="font-semibold text-[#940969] text-sm mb-1">Status de Rede</h4>
+                <div class="flex items-center gap-2 mt-2">
+                    <span id="statusDot" class="w-2 h-2 bg-gray-400 rounded-full"></span>
+                    <p id="statusText" class="text-xs text-pink-700 font-medium">A conectar...</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden">
+        <header class="bg-white border-b border-gray-200 px-8 py-5 flex justify-between items-center flex-shrink-0 z-20 shadow-sm">
+            <div>
+                <h2 id="page-title" class="text-2xl font-bold text-gray-800">Gerenciamento de Tarefas</h2>
+                <p class="text-sm text-gray-500 mt-1">Acompanhamento em tempo real</p>
+            </div>
+            <button onclick="openModal()" class="flex items-center gap-2 bg-[#940969] text-white px-5 py-2.5 rounded-lg hover:bg-[#740652] transition-colors shadow-md transform active:scale-95 duration-150">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span class="hidden sm:inline font-medium">Nova Tarefa</span>
+            </button>
+        </header>
+
+        <div class="flex-1 overflow-auto p-8">
+            <div class="max-w-[1600px] mx-auto space-y-8">
+                <!-- DASHBOARD VIEW -->
+                <div id="dashboard-view" class="hidden space-y-6 slide-up">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                            <span class="text-gray-500 text-xs font-medium uppercase tracking-wider">Total</span>
+                            <h3 id="card-total" class="text-2xl font-bold text-gray-800 mt-1">0</h3>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl border border-orange-100 shadow-sm">
+                            <span class="text-orange-600 text-xs font-medium uppercase tracking-wider">Pendentes</span>
+                            <h3 id="card-pending" class="text-2xl font-bold text-gray-800 mt-1">0</h3>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl border border-yellow-100 shadow-sm">
+                            <span class="text-yellow-600 text-xs font-medium uppercase tracking-wider">Em Execução</span>
+                            <h3 id="card-execution" class="text-2xl font-bold text-gray-800 mt-1">0</h3>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl border border-green-100 shadow-sm">
+                            <span class="text-green-600 text-xs font-medium uppercase tracking-wider">Concluídas</span>
+                            <h3 id="card-completed" class="text-2xl font-bold text-gray-800 mt-1">0</h3>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl border border-red-100 shadow-sm">
+                            <span class="text-red-600 text-xs font-medium uppercase tracking-wider">Urgentes P0</span>
+                            <h3 id="card-urgent" class="text-2xl font-bold text-gray-800 mt-1">0</h3>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <h3 class="font-bold text-gray-800 mb-4">Demanda por Município</h3>
+                            <div class="h-64"><canvas id="chartMunicipality"></canvas></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <h3 class="font-bold text-gray-800 mb-4">Demanda por Sistema</h3>
+                            <div class="h-64"><canvas id="chartSystem"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LIST VIEW -->
+                <div id="list-view" class="space-y-6">
+                    <div class="flex flex-col xl:flex-row justify-between items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <div class="relative w-full xl:w-96">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                            <input type="text" id="searchInput" placeholder="Buscar tarefa..." class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm">
+                        </div>
+                        <div class="flex gap-3">
+                            <select id="municipalityFilter" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none"></select>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-[#940969] text-white">
+                                    <tr>
+                                        <th class="px-6 py-4">Tarefa</th>
+                                        <th class="px-6 py-4">Município / Sistema</th>
+                                        <th class="px-6 py-4 text-center">Prioridade</th>
+                                        <th class="px-6 py-4 text-center">Status</th>
+                                        <th class="px-6 py-4 text-right">Data Inclusão</th>
+                                        <th class="px-6 py-4 w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL -->
+    <div id="modal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 fade-in">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 id="modalTitle" class="font-bold text-gray-800">Tarefa</h3>
+                <button onclick="closeModal()" class="text-gray-400">✕</button>
+            </div>
+            <form id="demandForm" class="p-6 space-y-4">
+                <input type="hidden" name="id" id="demandId">
+                <input type="hidden" name="firestoreId" id="firestoreId">
+                
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição</label>
+                    <input required name="title" id="inputTitle" type="text" class="w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#940969]">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Município</label>
+                        <select id="modalMunicipality" name="requester" class="w-full px-4 py-2 border rounded-lg outline-none bg-white"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Sistema</label>
+                        <select name="department" id="inputDepartment" class="w-full px-4 py-2 border rounded-lg outline-none bg-white">
+                            <option value="Atenção Primária">Atenção Primária</option>
+                            <option value="BPA / FPO">BPA / FPO</option>
+                            <option value="CNES">CNES</option>
+                            <option value="e-SUS">e-SUS</option>
+                            <option value="SIA/SUS">SIA/SUS</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Prioridade</label>
+                        <select name="priority" id="inputPriority" class="w-full px-4 py-2 border rounded-lg outline-none">
+                            <option value="P0">P0 - Urgente</option>
+                            <option value="P1">P1 - Alta</option>
+                            <option value="P2" selected>P2 - Média</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
+                        <select name="status" id="inputStatus" class="w-full px-4 py-2 border rounded-lg outline-none">
+                            <option value="Não iniciada">Não iniciada</option>
+                            <option value="Em execução">Em execução</option>
+                            <option value="Concluída">Concluída</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-gray-500 text-sm">Cancelar</button>
+                    <button type="submit" class="px-6 py-2 bg-[#940969] text-white rounded-lg text-sm font-bold shadow-md">Gravar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- DADOS DO SEU FIREBASE ---
+        let firebaseConfig;
+        try {
+            // Tenta usar a configuração automática se disponível (Canvas)
+            firebaseConfig = JSON.parse(__firebase_config);
+        } catch(e) {
+            // Configuração fornecida por você para uso externo (GitHub)
+            firebaseConfig = {
+                apiKey: "AIzaSyB2MnM6HIIK8JqvxJiWXYWKCOq0SJc0NVU",
+                authDomain: "tarefasjulia-b8007.firebaseapp.com",
+                projectId: "tarefasjulia-b8007",
+                storageBucket: "tarefasjulia-b8007.firebasestorage.app",
+                messagingSenderId: "287504808626",
+                appId: "1:287504808626:web:a98ab2e529d656cf30a7ab",
+                measurementId: "G-YNRQSXDXHQ"
+            };
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // Identificador único para os dados no Firestore
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'tarefasjulia-b8007-prod';
+
+        let demands = [];
+        let state = { searchTerm: '', filterMunicipality: 'Todos', activeTab: 'dashboard', charts: {} };
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Login anônimo para permitir salvar dados sem senha inicialmente
+            await signInAnonymously(auth);
+            
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    setupListener();
+                    updateConnectionStatus(true);
+                }
+            });
+
+            // Listeners UI
+            document.getElementById('searchInput').addEventListener('input', e => { state.searchTerm = e.target.value; render(); });
+            document.getElementById('municipalityFilter').addEventListener('change', e => { state.filterMunicipality = e.target.value; render(); });
+            document.getElementById('demandForm').addEventListener('submit', e => { e.preventDefault(); handleSave(new FormData(e.target)); });
+            
+            lucide.createIcons();
+            switchTab('dashboard');
+        });
+
+        function setupListener() {
+            // Caminho obrigatório para garantir permissões de acesso
+            const q = collection(db, 'artifacts', appId, 'public', 'data', 'demands');
+            
+            onSnapshot(q, (snapshot) => {
+                demands = snapshot.docs.map(d => ({ ...d.data(), firestoreId: d.id }));
+                
+                // Ordena por ID decrescente para os novos aparecerem no topo
+                demands.sort((a,b) => {
+                    const numA = parseInt(a.id?.split('-')[1]) || 0;
+                    const numB = parseInt(b.id?.split('-')[1]) || 0;
+                    return numB - numA;
+                });
+                
+                initFilters();
+                render();
+                document.getElementById('loading-overlay').style.display = 'none';
+            }, (error) => {
+                console.error("Erro Firestore:", error);
+                // Dica: Se der erro de permissão, verifique as "Rules" do seu Firestore no Console
+            });
+        }
+
+        async function handleSave(formData) {
+            const fId = formData.get('firestoreId');
+            const data = {
+                title: formData.get('title'),
+                requester: formData.get('requester'),
+                department: formData.get('department'),
+                priority: formData.get('priority'),
+                status: formData.get('status'),
+                inclusionDate: new Date().toISOString().split('T')[0]
+            };
+
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'demands');
+            
+            try {
+                if (fId) {
+                    await updateDoc(doc(colRef, fId), data);
+                } else {
+                    // Calcula próximo número de ID T-XXX
+                    let maxNum = 0;
+                    demands.forEach(d => {
+                        const n = parseInt(d.id?.split('-')[1]) || 0;
+                        if(n > maxNum) maxNum = n;
+                    });
+                    data.id = `T-${String(maxNum + 1).padStart(3, '0')}`;
+                    await addDoc(colRef, data);
+                }
+                closeModal();
+            } catch (err) {
+                alert("Erro ao gravar dados. Verifique as regras do seu Firestore.");
+            }
+        }
+
+        // Funções de Render e Navegação
+        window.switchTab = (tab) => {
+            state.activeTab = tab;
+            document.getElementById('dashboard-view').classList.toggle('hidden', tab !== 'dashboard');
+            document.getElementById('list-view').classList.toggle('hidden', tab !== 'list');
+            
+            const btnList = document.getElementById('btn-list');
+            const btnDash = document.getElementById('btn-dashboard');
+            
+            if(tab === 'list') {
+                btnList.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors bg-[#940969]/10 text-[#940969] shadow-sm';
+                btnDash.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50';
+            } else {
+                btnDash.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors bg-[#940969]/10 text-[#940969] shadow-sm';
+                btnList.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50';
+            }
+            render();
+        };
+
+        function initFilters() {
+            const munis = ['Todos', ...new Set(demands.map(d => d.requester))].sort();
+            document.getElementById('municipalityFilter').innerHTML = munis.map(m => `<option value="${m}">${m}</option>`).join('');
+            document.getElementById('modalMunicipality').innerHTML = munis.filter(m => m !== 'Todos').map(m => `<option value="${m}">${m}</option>`).join('') + `<option value="Outro">Outro</option>`;
+        }
+
+        function render() {
+            const filtered = demands.filter(d => {
+                const title = d.title || "";
+                const mSearch = title.toLowerCase().includes(state.searchTerm.toLowerCase());
+                const mMuni = state.filterMunicipality === 'Todos' || d.requester === state.filterMunicipality;
+                return mSearch && mMuni;
+            });
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = filtered.map(d => `
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4">
+                        <span class="text-[10px] text-gray-400 font-mono block">${d.id || '---'}</span>
+                        <div class="font-medium text-gray-900">${d.title}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-medium text-gray-700">${d.requester}</div>
+                        <div class="text-[10px] text-gray-400">${d.department}</div>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-2 py-1 bg-gray-100 rounded text-[10px] font-bold border ${d.priority === 'P0' ? 'text-red-600 border-red-100' : 'text-gray-500'}">${d.priority}</span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-2 py-1 rounded-full text-[10px] font-bold ${d.status === 'Concluída' ? 'bg-green-100 text-green-700' : 'bg-pink-100 text-pink-700'}">${d.status}</span>
+                    </td>
+                    <td class="px-6 py-4 text-right text-gray-400 text-xs">${d.inclusionDate || '---'}</td>
+                    <td class="px-6 py-4 text-right">
+                        <button onclick="editDemand('${d.firestoreId}')" class="text-[#940969] hover:underline text-xs font-bold">EDITAR</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('card-total').textContent = demands.length;
+            document.getElementById('card-completed').textContent = demands.filter(d => d.status === 'Concluída').length;
+            document.getElementById('card-pending').textContent = demands.filter(d => d.status === 'Não iniciada').length;
+            document.getElementById('card-execution').textContent = demands.filter(d => d.status === 'Em execução').length;
+            document.getElementById('card-urgent').textContent = demands.filter(d => d.priority === 'P0' && d.status !== 'Concluída').length;
+
+            if (state.activeTab === 'dashboard') updateCharts();
+            lucide.createIcons();
+        }
+
+        window.editDemand = (fId) => {
+            const d = demands.find(i => i.firestoreId === fId);
+            if (!d) return;
+            document.getElementById('firestoreId').value = fId;
+            document.getElementById('inputTitle').value = d.title;
+            document.getElementById('modalMunicipality').value = d.requester;
+            document.getElementById('inputDepartment').value = d.department;
+            document.getElementById('inputPriority').value = d.priority;
+            document.getElementById('inputStatus').value = d.status;
+            document.getElementById('modalTitle').textContent = `Editar ${d.id}`;
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modal').classList.add('flex');
+        };
+
+        window.openModal = () => {
+            document.getElementById('demandForm').reset();
+            document.getElementById('firestoreId').value = '';
+            document.getElementById('modalTitle').textContent = 'Nova Tarefa';
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modal').classList.add('flex');
+        };
+
+        window.closeModal = () => document.getElementById('modal').classList.add('hidden');
+
+        function updateConnectionStatus(isOnline) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            dot.className = `w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`;
+            text.textContent = isOnline ? 'Ligado ao Firebase' : 'Sem ligação';
+        }
+
+        function updateCharts() {
+            const muniData = {};
+            demands.forEach(d => {
+                if(d.requester) muniData[d.requester] = (muniData[d.requester] || 0) + 1;
+            });
+            
+            const ctxMuni = document.getElementById('chartMunicipality');
+            if(state.charts.muni) state.charts.muni.destroy();
+            state.charts.muni = new Chart(ctxMuni, {
+                type: 'bar',
+                data: { labels: Object.keys(muniData), datasets: [{ data: Object.values(muniData), backgroundColor: '#940969', borderRadius: 5 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            const sysData = {};
+            demands.forEach(d => {
+                if(d.department) sysData[d.department] = (sysData[d.department] || 0) + 1;
+            });
+            const ctxSys = document.getElementById('chartSystem');
+            if(state.charts.sys) state.charts.sys.destroy();
+            state.charts.sys = new Chart(ctxSys, {
+                type: 'doughnut',
+                data: { labels: Object.keys(sysData), datasets: [{ data: Object.values(sysData), backgroundColor: ['#940969', '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'] }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        window.closeAllDropdowns = function(event) {
+            // Placeholder para compatibilidade com o HTML
+        }
+    </script>
+</body>
+</html>
