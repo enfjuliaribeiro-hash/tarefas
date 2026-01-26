@@ -205,9 +205,8 @@
 
     <!-- Firebase -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-analytics.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB2MnM6HIIK8JqvxJiWXYWKCOq0SJc0NVU",
@@ -220,9 +219,7 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = 'producao_v1';
+        const analytics = getAnalytics(app);
 
         let demands = [];
         let state = { searchTerm: '', filterMunicipality: 'Todos', activeTab: 'dashboard', charts: {} };
@@ -426,4 +423,5 @@
         document.getElementById('demandForm').addEventListener('submit', e => { e.preventDefault(); handleSave(new FormData(e.target)); });
     </script>
 </body>
+
 </html>
