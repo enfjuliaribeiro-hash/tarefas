@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Gestão - Júlia Ribeiro</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js para Gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Animações simples */
+        .fade-in { animation: fadeIn 0.2s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .slide-up { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        /* Cor Personalizada Júlia */
+        .bg-julia { background-color: #940969; }
+        .text-julia { color: #940969; }
+        .border-julia { border-color: #940969; }
+        .ring-julia { --tw-ring-color: #940969; }
+        .hover-bg-julia-dark:hover { background-color: #740652; }
+        .bg-julia-light { background-color: rgba(148, 9, 105, 0.1); }
+
+        /* Dropdown Animation */
+        .dropdown-enter {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        .dropdown-enter-active {
+            opacity: 1;
+            transform: scale(1);
+            transition: opacity 100ms ease-out, transform 100ms ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 h-screen flex overflow-hidden" onclick="closeAllDropdowns(event)">
+
+    <!-- TELA DE LOGIN -->
+    <div id="login-screen" class="fixed inset-0 bg-gray-50 z-[60] flex items-center justify-center flex-col gap-8 transition-all duration-500">
+        <div class="text-center space-y-4 animate-fade-in">
+            <div class="w-20 h-20 bg-[#940969] rounded-2xl flex items-center justify-center shadow-xl mx-auto mb-6 transform -rotate-3">
+                <i data-lucide="layout-dashboard" class="text-white w-10 h-10"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800">Painel de Gestão</h1>
+            <p class="text-gray-500 max-w-sm mx-auto">Faça login com sua conta Google para acessar as tarefas</p>
+        </div>
+        <button onclick="loginWithGoogle()" class="flex items-center gap-3 bg-white border border-gray-200 text-gray-700 px-8 py-4 rounded-xl hover:bg-white hover:border-[#940969] hover:text-[#940969] hover:shadow-lg transition-all font-medium group">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6 group-hover:scale-110 transition-transform" alt="Google">
+            <span class="text-lg">Entrar com Google</span>
+        </button>
+        <p id="login-status" class="text-sm text-gray-400 h-4"></p>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col flex-shrink-0">
+        <div class="p-6 flex items-center gap-3 border-b border-gray-100">
+            <div class="w-8 h-8 bg-[#940969] rounded-lg flex items-center justify-center shadow-sm">
+                <i data-lucide="layout-dashboard" class="text-white w-5 h-5"></i>
+            </div>
+            <span class="font-bold text-lg text-gray-800 tracking-tight">Júlia Ribeiro</span>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-2">
+            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50">
+                <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                Visão Geral (KPIs)
+            </button>
+            <button onclick="switchTab('list')" id="btn-list" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors bg-[#940969]/10 text-[#940969] shadow-sm">
+                <i data-lucide="list-todo" class="w-5 h-5"></i>
+                Lista de Tarefas
+            </button>
+            <!-- ABA CONFIGURAÇÕES -->
+            <button onclick="switchTab('config')" id="btn-config" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+                Configurações
+            </button>
+            
+            <button onclick="handleLogout()" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-red-600 hover:bg-red-50 mt-auto">
+                <i data-lucide="log-out" class="w-5 h-5"></i>
+                Sair
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-gray-100">
+            <div class="bg-gradient-to-br from-pink-50 to-purple-50 p-4 rounded-xl border border-pink-100">
+                <h4 class="font-semibold text-[#940969] text-sm mb-1">Status do Sistema</h4>
+                <div class="flex items-center gap-2 mt-2">
+                    <span id="connection-status-dot" class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                    <p id="connection-status-text" class="text-xs text-pink-700">Conectando...</p>
+                </div>
+                <div class="flex items-center gap-2 mt-2 pt-2 border-t border-pink-100/50">
+                    <img id="user-avatar" src="" class="w-5 h-5 rounded-full hidden" alt="Avatar">
+                    <p id="user-name" class="text-[10px] text-pink-700 truncate max-w-[120px]">Visitante</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden">
+        
+        <!-- HEADER -->
+        <header class="bg-white border-b border-gray-200 px-8 py-5 flex justify-between items-center flex-shrink-0 z-20 shadow-sm">
+            <div>
+                <h2 id="page-title" class="text-2xl font-bold text-gray-800">Gerenciamento de Tarefas</h2>
+                <p class="text-sm text-gray-500 mt-1">Acompanhamento das planilhas mensais</p>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <button onclick="openModal()" class="flex items-center gap-2 bg-[#940969] text-white px-5 py-2.5 rounded-lg hover:bg-[#740652] transition-colors shadow-md hover:shadow-lg transform active:scale-95 duration-150">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline font-medium">Nova Tarefa</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- AREA DE SCROLL -->
+        <div class="flex-1 overflow-auto p-8">
+            <div class="max-w-[1600px] mx-auto space-y-8">
+
+                <!-- DASHBOARD VIEW -->
+                <div id="dashboard-view" class="hidden space-y-6 slide-up">
+                    
+                    <!-- BARRA DE FILTROS DO DASHBOARD (NOVO) -->
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-wrap gap-4 items-center">
+                        <div class="flex items-center gap-2 text-[#940969] font-semibold border-r border-gray-200 pr-4">
+                            <i data-lucide="filter" class="w-5 h-5"></i>
+                            <span>Filtros do Painel</span>
+                        </div>
+                        
+                        <div class="flex flex-col sm:flex-row gap-4 flex-1">
+                            <!-- Filtro Município Dashboard -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-semibold text-gray-500 uppercase">Município:</span>
+                                <select id="dashMunicipalityFilter" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-[#940969] focus:border-[#940969] block p-2 cursor-pointer min-w-[160px]">
+                                    <!-- Injetado via JS -->
+                                </select>
+                            </div>
+
+                            <!-- Filtro Competência Dashboard -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-semibold text-gray-500 uppercase">Competência:</span>
+                                <select id="dashCompetenceFilter" class="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-[#940969] focus:border-[#940969] block p-2 cursor-pointer min-w-[140px]">
+                                    <!-- Injetado via JS -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Botão Limpar -->
+                         <button onclick="clearDashboardFilters()" class="text-xs text-gray-400 hover:text-[#940969] underline">
+                            Limpar Filtros
+                        </button>
+                    </div>
+
+                    <!-- Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="p-2 bg-[#940969]/10 rounded-lg"><i data-lucide="layout-dashboard" class="w-5 h-5 text-[#940969]"></i></div>
+                            </div>
+                            <span class="text-gray-500 text-xs font-medium uppercase tracking-wider">Total</span>
+                            <h3 id="card-total" class="text-2xl font-bold text-gray-800 mt-1">0</h3>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl border border-orange-100 shadow-sm">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="p-2 bg-orange-50 rounded-lg"><i data-lucide="hourglass" class="w-5 h-5 text-orange-600"></i></div>
+                            </div>
+                            <span class="text-orange-600 text-xs font-medium uppercase tracking-wider">Pendentes</span>
+                            <h3 id="card-pending" class="text-2xl font-bold text-gray-800 mt-1">0</h3>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl border border-yellow-100 shadow-sm">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="p-2 bg-yellow-50 rounded-lg"><i data-lucide="clock" class="w-5 h-5 text-yellow-600"></i></div>
+                            </div>
+                            <span class="text-yellow-600 text-xs font-medium uppercase tracking-wider">Em Execução</span>
+                            <h3 id="card-execution" class="text-2xl font-bold text-gray-800 mt-1">0</h3>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl border border-green-100 shadow-sm">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="p-2 bg-green-50 rounded-lg"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-600"></i></div>
+                            </div>
+                            <span class="text-green-600 text-xs font-medium uppercase tracking-wider">Concluídas</span>
+                            <h3 id="card-completed" class="text-2xl font-bold text-gray-800 mt-1">0</h3>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl border border-red-100 shadow-sm">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="p-2 bg-red-50 rounded-lg"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-600"></i></div>
+                            </div>
+                            <span class="text-red-600 text-xs font-medium uppercase tracking-wider">Urgência P0</span>
+                            <h3 id="card-urgent" class="text-2xl font-bold text-gray-800 mt-1">0</h3>
+                        </div>
+                    </div>
+
+                    <!-- Gráficos -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <i data-lucide="map-pin" class="w-4 h-4 text-[#940969]"></i> Demanda por Município
+                            </h3>
+                            <div class="h-64 relative"><canvas id="chartMunicipality"></canvas></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <i data-lucide="monitor" class="w-4 h-4 text-[#940969]"></i> Demanda por Sistema
+                            </h3>
+                            <div class="h-64 relative flex justify-center"><canvas id="chartSystem"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LIST VIEW -->
+                <div id="list-view" class="space-y-6">
+                    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <div class="relative w-full xl:w-80 group">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                            <input type="text" id="searchInput" placeholder="Buscar tarefa, sistema..." class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#940969] text-sm transition-shadow">
+                        </div>
+                        
+                        <!-- Filtros da Lista -->
+                        <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+                            <!-- Status -->
+                            <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
+                                <i data-lucide="filter" class="w-4 h-4 text-gray-500"></i>
+                                <span class="text-xs font-semibold text-gray-500 uppercase">Status:</span>
+                                <select id="statusFilter" class="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer">
+                                    <option value="Todos">Todos</option>
+                                    <option value="Não iniciada">Não iniciada</option>
+                                    <option value="Em execução">Em execução</option>
+                                    <option value="REPASSADO">Repassado</option>
+                                    <option value="Concluída">Concluída</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Município -->
+                            <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
+                                <i data-lucide="building-2" class="w-4 h-4 text-gray-500"></i>
+                                <span class="text-xs font-semibold text-gray-500 uppercase">Município:</span>
+                                <select id="municipalityFilter" class="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer max-w-[150px]">
+                                    <!-- Injetado via JS -->
+                                </select>
+                            </div>
+
+                            <!-- Competência (NOVO) -->
+                            <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
+                                <i data-lucide="calendar" class="w-4 h-4 text-gray-500"></i>
+                                <span class="text-xs font-semibold text-gray-500 uppercase">Mês:</span>
+                                <select id="competenceFilter" class="bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer">
+                                    <!-- Injetado via JS -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-gray-600">
+                                <thead class="bg-[#940969] text-white font-semibold border-b border-[#740652]">
+                                    <tr>
+                                        <th class="px-6 py-4 whitespace-nowrap">ID / Tarefa</th>
+                                        <th class="px-6 py-4">Município / Sistema</th>
+                                        <th class="px-6 py-4 text-center">Prioridade</th>
+                                        <th class="px-6 py-4 text-center">Status</th>
+                                        <th class="px-6 py-4 w-32">Progresso</th>
+                                        <th class="px-6 py-4 text-right">Inclusão</th>
+                                        <th class="px-6 py-4 text-right">Prazo</th>
+                                        <th class="px-6 py-4 w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody" class="divide-y divide-gray-100">
+                                    <!-- Linhas injetadas via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+                            <span id="resultsCount" class="text-sm text-gray-500">Mostrando 0 resultados</span>
+                            <div class="flex gap-2">
+                                <button class="px-3 py-1 border border-gray-200 rounded text-sm text-gray-600 disabled:opacity-50" disabled>Anterior</button>
+                                <button class="px-3 py-1 border border-gray-200 rounded text-sm text-gray-600 hover:bg-gray-50">Próximo</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONFIG VIEW -->
+                <div id="config-view" class="hidden space-y-6 slide-up">
+                    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="p-2 bg-[#940969]/10 rounded-lg">
+                                <i data-lucide="map-pin" class="w-6 h-6 text-[#940969]"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-800">Gerenciar Municípios</h3>
+                                <p class="text-sm text-gray-500">Adicione ou remova municípios para aparecer nos filtros e formulários.</p>
+                            </div>
+                        </div>
+
+                        <!-- Form Add -->
+                        <div class="flex gap-3 mb-8">
+                            <input type="text" id="newMunicipalityInput" placeholder="Nome do novo município..." class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm">
+                            <button onclick="handleAddMunicipality()" class="bg-[#940969] text-white px-5 py-2.5 rounded-lg hover:bg-[#740652] transition-colors font-medium flex items-center gap-2">
+                                <i data-lucide="plus" class="w-4 h-4"></i> Adicionar
+                            </button>
+                        </div>
+
+                        <!-- List -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="municipalityListContainer">
+                            <!-- Injetado via JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL TAREFA -->
+    <div id="modal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 fade-in">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 transform transition-all scale-100">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 id="modalTitle" class="font-bold text-gray-800 text-lg">Nova Tarefa</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-red-500 transition-colors">✕</button>
+            </div>
+            <form id="demandForm" class="p-6 space-y-5">
+                <input type="hidden" name="id" id="demandId">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Descrição da Tarefa</label>
+                    <input required name="title" id="inputTitle" type="text" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm" placeholder="Ex: Atualizar cadastro CNES...">
+                </div>
+                <div class="grid grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Município</label>
+                        <select id="modalMunicipality" name="requester" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm bg-white">
+                            <!-- Injetado via JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Sistema / ID</label>
+                        <select name="department" id="inputDepartment" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm bg-white">
+                            <option value="Atenção Primária" selected>Atenção Primária</option>
+                            <option value="BPA / FPO">BPA / FPO</option>
+                            <option value="CADSUS">CADSUS</option>
+                            <option value="CIHA">CIHA</option>
+                            <option value="CNES">CNES</option>
+                            <option value="e-SUS">e-SUS</option>
+                            <option value="Gestão">Gestão</option>
+                            <option value="SIA/SUS">SIA/SUS</option>
+                            <option value="SIH/SUS">SIH/SUS</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Prioridade</label>
+                        <select name="priority" id="inputPriority" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm bg-white">
+                            <option value="P0">P0 - Urgente</option>
+                            <option value="P1">P1 - Alta</option>
+                            <option value="P2" selected>P2 - Média</option>
+                            <option value="P3">P3 - Baixa</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Status Atual</label>
+                        <select name="status" id="inputStatus" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm bg-white">
+                            <option value="Não iniciada" selected>Não iniciada</option>
+                            <option value="Em execução">Em execução</option>
+                            <option value="REPASSADO">Repassado</option>
+                            <option value="Concluída">Concluída</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Data de Inclusão</label>
+                        <input name="inclusionDate" id="inputInclusionDate" type="date" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Prazo Final</label>
+                        <input name="deadline" id="inputDeadline" type="date" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#940969] outline-none text-sm">
+                    </div>
+                </div>
+                <div class="pt-6 flex justify-end gap-3 border-t border-gray-100 mt-2">
+                    <button type="button" onclick="closeModal()" class="px-5 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
+                    <button type="submit" class="px-5 py-2.5 bg-[#940969] text-white hover:bg-[#740652] rounded-lg text-sm font-medium shadow-md">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            getDocs, 
+            addDoc, 
+            updateDoc, 
+            doc,
+            onSnapshot,
+            deleteDoc,
+            setDoc,
+            query, 
+            orderBy
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import {
+            getAuth,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signOut,
+            onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        // CONFIGURAÇÃO DINÂMICA
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : {
+                apiKey: "AIzaSyB2MnM6HIIK8JqvxJiWXYWKCOq0SJc0NVU",
+                authDomain: "tarefasjulia-b8007.firebaseapp.com",
+                projectId: "tarefasjulia-b8007",
+                storageBucket: "tarefasjulia-b8007.firebasestorage.app",
+                messagingSenderId: "287504808626",
+                appId: "1:287504808626:web:a98ab2e529d656cf30a7ab"
+            };
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        window.db = db;
+        window.auth = auth;
+        window.appId = appId;
+        window.firestore = {
+            collection,
+            getDocs,
+            addDoc,
+            updateDoc,
+            deleteDoc,
+            setDoc,
+            doc,
+            onSnapshot,
+            query, 
+            orderBy
+        };
+        window.firebaseAuth = {
+            GoogleAuthProvider,
+            signInWithPopup,
+            signOut,
+            onAuthStateChanged
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            const loginScreen = document.getElementById('login-screen');
+            if (user) {
+                window.currentUser = user;
+                loginScreen.classList.add('opacity-0', 'pointer-events-none');
+                document.getElementById('user-name').textContent = user.displayName || user.email;
+                if(user.photoURL) {
+                    const avatar = document.getElementById('user-avatar');
+                    avatar.src = user.photoURL;
+                    avatar.classList.remove('hidden');
+                }
+                const event = new Event('firebase-ready');
+                window.dispatchEvent(event);
+            } else {
+                window.currentUser = null;
+                loginScreen.classList.remove('opacity-0', 'pointer-events-none');
+                document.getElementById('user-name').textContent = 'Aguardando login...';
+            }
+        });
+    </script>
+
+    <script>
+        // --- DADOS ---
+        let demands = [];
+        let municipalities = []; 
+
+        // --- ESTADO ---
+        let state = {
+            // Filtros Lista
+            filterStatus: 'Todos',
+            filterMunicipality: 'Todos',
+            filterCompetence: 'Todos',
+            searchTerm: '',
+            
+            // Filtros Dashboard
+            dashFilterMunicipality: 'Todos',
+            dashFilterCompetence: 'Todos',
+
+            activeTab: 'dashboard',
+            chartMunicipality: null,
+            chartSystem: null
+        };
+
+        // --- INICIALIZAÇÃO ---
+        document.addEventListener('DOMContentLoaded', () => {
+            window.addEventListener('firebase-ready', async () => {
+                document.getElementById('connection-status-text').textContent = 'Conectado';
+                document.getElementById('connection-status-dot').className = 'w-2 h-2 bg-green-500 rounded-full';
+                await loadMunicipalitiesFromFirebase(); 
+                await loadDemandsFromFirebase(); 
+            });
+
+            // Listeners da Lista
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                state.searchTerm = e.target.value;
+                renderApp();
+            });
+            document.getElementById('statusFilter').addEventListener('change', (e) => {
+                state.filterStatus = e.target.value;
+                renderApp();
+            });
+            document.getElementById('municipalityFilter').addEventListener('change', (e) => {
+                state.filterMunicipality = e.target.value;
+                renderApp();
+            });
+            document.getElementById('competenceFilter').addEventListener('change', (e) => {
+                state.filterCompetence = e.target.value;
+                renderApp();
+            });
+
+            // Listeners do Dashboard
+            document.getElementById('dashMunicipalityFilter').addEventListener('change', (e) => {
+                state.dashFilterMunicipality = e.target.value;
+                renderApp();
+            });
+            document.getElementById('dashCompetenceFilter').addEventListener('change', (e) => {
+                state.dashFilterCompetence = e.target.value;
+                renderApp();
+            });
+
+
+            document.getElementById('demandForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                handleFormSubmit(new FormData(e.target));
+            });
+            
+            lucide.createIcons();
+        });
+
+        // --- HELPER DE COMPETÊNCIA (Mês/Ano) ---
+        function getCompetenceFromDate(dateString) {
+            if (!dateString) return null;
+            // dateString formato YYYY-MM-DD
+            const [year, month] = dateString.split('-');
+            return `${year}-${month}`; // Chave de ordenação
+        }
+
+        function formatCompetenceLabel(compKey) {
+            if(!compKey) return 'Sem Data';
+            const [year, month] = compKey.split('-');
+            // Cria data (month-1 pois array começa em 0)
+            const date = new Date(year, month - 1);
+            // Formata: Janeiro/2026
+            const monthName = date.toLocaleString('pt-BR', { month: 'long' });
+            return `${monthName.charAt(0).toUpperCase() + monthName.slice(1)}/${year}`;
+        }
+
+        function getAllCompetences() {
+            // Extrai datas únicas das demandas
+            const comps = new Set();
+            demands.forEach(d => {
+                if (d.inclusionDate) {
+                    comps.add(getCompetenceFromDate(d.inclusionDate));
+                }
+            });
+            // Retorna array ordenado (mais recente primeiro)
+            return Array.from(comps).sort().reverse();
+        }
+
+        // --- FUNÇÕES DE LOGIN ---
+        async function loginWithGoogle() {
+            const statusText = document.getElementById('login-status');
+            statusText.textContent = "Abrindo pop-up do Google...";
+            try {
+                const provider = new window.firebaseAuth.GoogleAuthProvider();
+                await window.firebaseAuth.signInWithPopup(window.auth, provider);
+                statusText.textContent = "Login realizado com sucesso!";
+            } catch (error) {
+                console.error("Erro no login:", error);
+                statusText.textContent = "Erro: " + error.message;
+                statusText.className = "text-sm text-red-500 h-4";
+            }
+        }
+
+        async function handleLogout() {
+            try { await window.firebaseAuth.signOut(window.auth); } catch (error) { console.error(error); }
+        }
+
+        // --- FILTROS DASHBOARD ---
+        function clearDashboardFilters() {
+            state.dashFilterMunicipality = 'Todos';
+            state.dashFilterCompetence = 'Todos';
+            document.getElementById('dashMunicipalityFilter').value = 'Todos';
+            document.getElementById('dashCompetenceFilter').value = 'Todos';
+            renderApp();
+        }
+
+        // --- FIREBASE HELPER (MUNICÍPIOS) ---
+        function getMuniCollectionRef() {
+            return window.firestore.collection(window.db, 'artifacts', window.appId, 'public', 'data', 'municipalities');
+        }
+
+        async function loadMunicipalitiesFromFirebase() {
+            try {
+                if (!window.currentUser) return;
+                window.firestore.onSnapshot(
+                    getMuniCollectionRef(),
+                    async (snapshot) => {
+                        municipalities = [];
+                        snapshot.forEach((docSnap) => {
+                            municipalities.push({ id: docSnap.id, ...docSnap.data() });
+                        });
+                        
+                        // SEED INICIAL
+                        if(municipalities.length === 0) {
+                            console.log("Lista vazia. Criando municípios padrão...");
+                            const defaults = ['Cachoeira de Minas', 'Camanducaia', 'Córrego do Bom Jesus', 'Delfim Moreira', 'Itapeva', 'Pedralva', 'Salto na Gestão'];
+                            for(const muni of defaults) {
+                                await window.firestore.addDoc(getMuniCollectionRef(), { name: muni });
+                            }
+                        } else {
+                            municipalities.sort((a, b) => a.name.localeCompare(b.name));
+                            // Quando carrega municípios, precisamos atualizar os filtros
+                            renderFilters();
+                        }
+                    },
+                    (error) => console.error("Erro munis:", error)
+                );
+            } catch (error) { console.error(error); }
+        }
+
+        async function handleAddMunicipality() {
+            const input = document.getElementById('newMunicipalityInput');
+            const name = input.value.trim();
+            if(!name) return;
+            
+            if(municipalities.some(m => m.name.toLowerCase() === name.toLowerCase())) {
+                alert("Município já existe.");
+                return;
+            }
+
+            input.value = '';
+            input.placeholder = "Adicionando...";
+            
+            try {
+                await window.firestore.addDoc(getMuniCollectionRef(), { name: name });
+                input.placeholder = "Nome do novo município...";
+            } catch(e) {
+                alert("Erro ao adicionar: " + e.message);
+            }
+        }
+
+        async function deleteMunicipality(id) {
+            if(!confirm("Tem certeza que deseja remover este município?")) return;
+            try {
+                const ref = window.firestore.doc(window.db, 'artifacts', window.appId, 'public', 'data', 'municipalities', id);
+                await window.firestore.deleteDoc(ref);
+            } catch(e) { alert("Erro ao deletar: " + e.message); }
+        }
+
+        function renderMunicipalityListConfig() {
+            const container = document.getElementById('municipalityListContainer');
+            if(!container) return;
+            
+            container.innerHTML = municipalities.map(m => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-lg group hover:border-pink-200 transition-colors">
+                    <span class="font-medium text-gray-700">${m.name}</span>
+                    <button onclick="deleteMunicipality('${m.id}')" class="text-gray-400 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        // --- FIREBASE HELPER (TAREFAS) ---
+        function getCollectionRef() {
+            return window.firestore.collection(window.db, 'artifacts', window.appId, 'public', 'data', 'demands');
+        }
+
+        async function loadDemandsFromFirebase() {
+            try {
+                if (!window.currentUser) return;
+                window.firestore.onSnapshot(getCollectionRef(), (snapshot) => {
+                        demands = [];
+                        snapshot.forEach((docSnap) => { demands.push({ id: docSnap.id, ...docSnap.data() }); });
+                        renderFilters(); // Atualiza filtros (competências podem ter mudado)
+                        renderApp();
+                    }, (error) => console.error("Erro tasks:", error)
+                );
+            } catch (error) { console.error(error); }
+        }
+
+        async function handleFormSubmit(formData) {
+            const id = formData.get('id');
+            const status = formData.get('status');
+            let progress = status === 'Concluída' ? 100 : (status === 'Em execução' ? 50 : 0);
+
+            const newItemData = {
+                title: formData.get('title'),
+                requester: formData.get('requester'),
+                department: formData.get('department'),
+                priority: formData.get('priority'),
+                status: status,
+                inclusionDate: formData.get('inclusionDate'),
+                deadline: formData.get('deadline'),
+                progress: progress,
+            };
+
+            const submitBtn = document.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.textContent;
+            submitBtn.textContent = "Salvando...";
+            submitBtn.disabled = true;
+
+            try {
+                if (!id) {
+                    await window.firestore.addDoc(getCollectionRef(), { ...newItemData, createdAt: new Date().toISOString() });
+                } else {
+                    const docRef = window.firestore.doc(window.db, 'artifacts', window.appId, 'public', 'data', 'demands', id);
+                    await window.firestore.updateDoc(docRef, newItemData);
+                }
+                closeModal();
+            } catch (error) {
+                console.error("Erro:", error);
+                alert("Erro ao salvar: " + error.message);
+            } finally {
+                submitBtn.textContent = originalBtnText;
+                submitBtn.disabled = false;
+            }
+        }
+
+        // --- RENDER GERAL ---
+        function switchTab(tab) {
+            state.activeTab = tab;
+            const title = document.getElementById('page-title');
+            const views = ['dashboard', 'list', 'config'];
+            const btns = ['btn-dashboard', 'btn-list', 'btn-config'];
+
+            btns.forEach(bId => {
+                const btn = document.getElementById(bId);
+                btn.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50';
+            });
+            const activeBtn = document.getElementById(`btn-${tab}`);
+            activeBtn.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors bg-[#940969]/10 text-[#940969] shadow-sm';
+
+            views.forEach(v => {
+                const el = document.getElementById(`${v}-view`);
+                if(v === tab) { el.classList.remove('hidden'); } 
+                else { el.classList.add('hidden'); }
+            });
+
+            if(tab === 'config') title.textContent = 'Configurações do Sistema';
+            else if(tab === 'list') title.textContent = 'Gerenciamento de Tarefas';
+            else title.textContent = 'Visão Geral (KPIs)';
+            
+            renderApp();
+            if(tab === 'config') renderMunicipalityListConfig();
+        }
+
+        function renderFilters() {
+            // 1. Municípios
+            const muniOptions = municipalities.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+            
+            // List View Filter
+            const listMuniSelect = document.getElementById('municipalityFilter');
+            const listMuniVal = listMuniSelect.value || 'Todos';
+            listMuniSelect.innerHTML = `<option value="Todos">Todos</option>` + muniOptions;
+            if (municipalities.some(m => m.name === listMuniVal) || listMuniVal === 'Todos') listMuniSelect.value = listMuniVal;
+
+            // Dashboard Filter
+            const dashMuniSelect = document.getElementById('dashMunicipalityFilter');
+            const dashMuniVal = dashMuniSelect.value || 'Todos';
+            dashMuniSelect.innerHTML = `<option value="Todos">Todos</option>` + muniOptions;
+            dashMuniSelect.value = dashMuniVal; // Mantém seleção
+
+            // Modal Select (Nova Tarefa)
+            document.getElementById('modalMunicipality').innerHTML = `<option value="" disabled selected>Selecione...</option>` + muniOptions + `<option value="Outro">Outro / Geral</option>`;
+
+            // 2. Competências (Datas)
+            const competences = getAllCompetences();
+            const compOptions = competences.map(c => `<option value="${c}">${formatCompetenceLabel(c)}</option>`).join('');
+
+            // List View Filter
+            const listCompSelect = document.getElementById('competenceFilter');
+            const listCompVal = listCompSelect.value || 'Todos';
+            listCompSelect.innerHTML = `<option value="Todos">Todos</option>` + compOptions;
+            if (competences.includes(listCompVal) || listCompVal === 'Todos') listCompSelect.value = listCompVal;
+
+            // Dashboard Filter
+            const dashCompSelect = document.getElementById('dashCompetenceFilter');
+            const dashCompVal = dashCompSelect.value || 'Todos';
+            dashCompSelect.innerHTML = `<option value="Todos">Todos</option>` + compOptions;
+            dashCompSelect.value = dashCompVal;
+        }
+
+        function renderApp() {
+            // Separação de dados para Dashboard vs Lista
+            let dashboardData = demands;
+            let listData = demands;
+
+            // --- FILTRAGEM DASHBOARD ---
+            if (state.activeTab === 'dashboard') {
+                dashboardData = demands.filter(item => {
+                    const matchMuni = state.dashFilterMunicipality === 'Todos' || item.requester === state.dashFilterMunicipality;
+                    const itemComp = getCompetenceFromDate(item.inclusionDate);
+                    const matchComp = state.dashFilterCompetence === 'Todos' || itemComp === state.dashFilterCompetence;
+                    return matchMuni && matchComp;
+                });
+                
+                const stats = calculateStats(dashboardData);
+                document.getElementById('card-total').textContent = stats.total;
+                document.getElementById('card-pending').textContent = stats.pending;
+                document.getElementById('card-execution').textContent = stats.inProgress;
+                document.getElementById('card-completed').textContent = stats.completed;
+                document.getElementById('card-urgent').textContent = stats.urgent;
+                
+                renderCharts(dashboardData);
+            }
+
+            // --- FILTRAGEM LISTA ---
+            if (state.activeTab === 'list') {
+                listData = getFilteredDemands(); // Usa os filtros da tab Lista
+                renderTable(listData);
+                document.getElementById('resultsCount').textContent = `Mostrando ${listData.length} de ${demands.length} resultados`;
+            }
+            
+            lucide.createIcons();
+        }
+
+        function getFilteredDemands() {
+            return demands.filter(item => {
+                const matchesStatus = state.filterStatus === 'Todos' || item.status === state.filterStatus;
+                const matchesMunicipality = state.filterMunicipality === 'Todos' || item.requester === state.filterMunicipality;
+                
+                const itemComp = getCompetenceFromDate(item.inclusionDate);
+                const matchesCompetence = state.filterCompetence === 'Todos' || itemComp === state.filterCompetence;
+
+                const searchLower = state.searchTerm.toLowerCase();
+                const title = item.title || '';
+                const requester = item.requester || '';
+                const department = item.department || '';
+                const matchesSearch = title.toLowerCase().includes(searchLower) || requester.toLowerCase().includes(searchLower) || department.toLowerCase().includes(searchLower);
+                
+                return matchesStatus && matchesMunicipality && matchesCompetence && matchesSearch;
+            });
+        }
+
+        function calculateStats(data) {
+            return {
+                total: data.length,
+                completed: data.filter(d => d.status === 'Concluída').length,
+                inProgress: data.filter(d => d.status === 'Em execução' || d.status === 'REPASSADO').length,
+                pending: data.filter(d => d.status === 'Não iniciada').length,
+                urgent: data.filter(d => d.priority === 'P0' && d.status !== 'Concluída').length,
+            };
+        }
+
+        function renderCharts(data) {
+            const municipalityCount = {};
+            const systemCount = {};
+            data.forEach(d => {
+                const muni = d.requester || 'Não informado';
+                municipalityCount[muni] = (municipalityCount[muni] || 0) + 1;
+                const sys = d.department || 'Outros';
+                systemCount[sys] = (systemCount[sys] || 0) + 1;
+            });
+            const sortedMuni = Object.entries(municipalityCount).sort(([,a], [,b]) => b - a);
+            const muniLabels = sortedMuni.map(([label]) => label);
+            const muniValues = sortedMuni.map(([,value]) => value);
+            const sysLabels = Object.keys(systemCount);
+            const sysValues = Object.values(systemCount);
+
+            const ctxMuni = document.getElementById('chartMunicipality').getContext('2d');
+            if (state.chartMunicipality) state.chartMunicipality.destroy();
+            state.chartMunicipality = new Chart(ctxMuni, {
+                type: 'bar',
+                data: { labels: muniLabels, datasets: [{ label: 'Tarefas', data: muniValues, backgroundColor: '#940969', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } } }
+            });
+
+            const ctxSys = document.getElementById('chartSystem').getContext('2d');
+            if (state.chartSystem) state.chartSystem.destroy();
+            const colors = ['#940969', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6366f1', '#84cc16'];
+            state.chartSystem = new Chart(ctxSys, {
+                type: 'doughnut',
+                data: { labels: sysLabels, datasets: [{ data: sysValues, backgroundColor: colors, borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } } } }
+            });
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-16 text-center text-gray-400 bg-gray-50/50"><div class="flex flex-col items-center gap-3"><div class="bg-gray-100 p-4 rounded-full"><i data-lucide="search" class="w-8 h-8 text-gray-400"></i></div><p class="font-medium text-gray-600">Nenhuma tarefa encontrada</p></div></td></tr>`;
+                return;
+            }
+            tbody.innerHTML = data.map(item => `
+                <tr class="hover:bg-gray-50 transition-colors group">
+                    <td class="px-6 py-4"><span class="text-[10px] text-gray-400 font-mono block mb-1" title="${item.id}">${item.id.substring(0,6)}...</span><div class="font-medium text-gray-900 line-clamp-2" title="${item.title}">${item.title}</div></td>
+                    <td class="px-6 py-4"><div class="flex flex-col gap-1"><div class="flex items-center gap-1.5 text-gray-900 font-medium"><i data-lucide="building-2" class="w-3.5 h-3.5 text-gray-400"></i>${getMunicipalityBadge(item.requester || 'N/A')}</div><div class="flex items-center gap-1.5 text-xs text-gray-500"><i data-lucide="tag" class="w-3 h-3 text-gray-400"></i><span class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">${item.department || 'Geral'}</span></div></div></td>
+                    <td class="px-6 py-4 text-center">${getPriorityBadge(item.priority)}</td>
+                    <td class="px-6 py-4 text-center"><div class="flex justify-center">${getStatusBadge(item.status)}</div></td>
+                    <td class="px-6 py-4"><div class="flex items-center gap-3"><div class="flex-1 bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full transition-all duration-500 ${item.progress === 100 ? 'bg-green-500' : (item.progress > 0 ? 'bg-[#940969]' : 'bg-gray-300')}" style="width: ${item.progress}%"></div></div><span class="text-xs text-gray-500 font-medium w-8 text-right">${item.progress}%</span></div></td>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">${item.inclusionDate ? `<div class="text-sm text-gray-600">${new Date(item.inclusionDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>` : '<span class="text-gray-300 text-xs italic">-</span>'}</td>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">${item.deadline ? `<div class="flex items-center justify-end gap-1.5 text-gray-600 bg-gray-50 px-2 py-1 rounded inline-block"><i data-lucide="calendar" class="w-3.5 h-3.5"></i>${new Date(item.deadline).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>` : '<span class="text-gray-300 text-xs italic">Sem prazo</span>'}</td>
+                    <td class="px-6 py-4 text-right relative">
+                        <button onclick="toggleDropdown(event, '${item.id}')" class="text-gray-400 hover:text-[#940969] p-1 hover:bg-pink-50 rounded transition-colors focus:outline-none"><i data-lucide="more-vertical" class="w-4 h-4"></i></button>
+                        <div id="dropdown-${item.id}" class="hidden absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-xl border border-gray-100 z-10 overflow-hidden text-left dropdown-enter">
+                            <button onclick="editDemand('${item.id}')" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#940969] flex items-center gap-2"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i> Editar</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // --- HELPERS VISUAIS ---
+        function getStatusBadge(status) {
+            const styles = { 'Concluída': 'bg-green-100 text-green-700 border-green-200', 'Em execução': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'Não iniciada': 'bg-orange-100 text-orange-700 border-orange-200', 'REPASSADO': 'bg-indigo-100 text-indigo-700 border-indigo-200' };
+            const icons = { 'Concluída': 'check-circle-2', 'Em execução': 'clock', 'Não iniciada': 'alert-circle', 'REPASSADO': 'arrow-right-circle' };
+            return `<span class="flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles['Não iniciada']}"><i data-lucide="${icons[status] || 'alert-circle'}" class="w-3 h-3 mr-1"></i> ${status}</span>`;
+        }
+        function getPriorityBadge(priority) {
+            const styles = { 'P0': 'bg-red-100 text-red-700 border border-red-200', 'P1': 'bg-orange-50 text-orange-700 border border-orange-200', 'P2': 'bg-yellow-50 text-yellow-700 border border-yellow-200', 'P3': 'bg-blue-50 text-blue-700 border border-blue-200' };
+            return `<span class="px-2 py-1 rounded text-xs font-bold whitespace-nowrap ${styles[priority] || 'bg-gray-50 text-gray-600'}">${priority}</span>`;
+        }
+        function getMunicipalityBadge(municipality) {
+            const styles = { 'Cachoeira de Minas': 'bg-cyan-100 text-cyan-700 border-cyan-200', 'Camanducaia': 'bg-indigo-100 text-indigo-700 border-indigo-200', 'Córrego do Bom Jesus': 'bg-emerald-100 text-emerald-700 border-emerald-200', 'Delfim Moreira': 'bg-violet-100 text-violet-700 border-violet-200', 'Itapeva': 'bg-rose-100 text-rose-700 border-rose-200', 'Pedralva': 'bg-amber-100 text-amber-700 border-amber-200', 'Salto na Gestão': 'bg-slate-100 text-slate-700 border-slate-200' };
+            return `<span class="inline-block px-2 py-0.5 rounded text-xs font-semibold border ${styles[municipality] || 'bg-gray-100 text-gray-700 border-gray-200'}">${municipality}</span>`;
+        }
+    </script>
+</body>
+</html>
